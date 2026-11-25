@@ -22,7 +22,7 @@ description: "오늘 수업을 한 번에 처리한다 — 요일로 과목을 �
 
 ```
 git pull --rebase
-python auto/fetch_materials.py <slug…>      # aside 있을 때. 종료코드 2 = 로그인 만료 → aside 로 재로그인 후 한 번 더
+python auto/fetch_materials.py <slug…>      # aside 있을 때. 세션 만료면 스스로 재로그인(최대 3회)
 ```
 - `~/Downloads` 에 학생이 내려받은 PDF·PPTX·HWP 가 있으면 과목을 판별해 `<과목폴더>/materials/<NN>주차_<원본명>` 으로 옮긴다.
 - 맥이고 새 LMS 영상이 있으면 `/lms-recap` (Windows 는 건너뜀).
