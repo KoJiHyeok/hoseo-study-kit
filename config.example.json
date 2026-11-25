@@ -1,0 +1,30 @@
+{
+  "school": "호서대",
+  "semester": "2026-2",
+  "semester_start": "2026-08-31",
+  "lms_base": "https://learn.hoseo.ac.kr",
+  "site_url": "",
+  "courses": [
+    {
+      "slug": "자료구조",
+      "name": "자료구조",
+      "prof": "홍길동",
+      "when": "화 10–12",
+      "room": "",
+      "dir": "자료구조",
+      "short": "자구",
+      "agent": "ds",
+      "lms_id": 12345,
+      "exam_weekly": true
+    },
+    {
+      "slug": "영어",
+      "name": "대학영어회화",
+      "prof": "",
+      "when": "목 10–12",
+      "dir": "대학영어회화",
+      "agent": "eng",
+      "lms_id": 12346
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+# 비밀 — 절대 커밋하지 않는다
+auto/.env
+
+# 기기 로컬 로그·산출물
+auto/last-run.out
+auto/notify.log
+auto/launchd.err
+__pycache__/
+*.pyc
+.DS_Store

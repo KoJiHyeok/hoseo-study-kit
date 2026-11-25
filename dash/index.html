@@ -1,0 +1,1068 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>할 일</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Gowun+Batang:wght@700&family=Gaegu:wght@700&display=swap" rel="stylesheet">
+<style>
+  /* 시안 A '형광펜 노트' — 32px 줄 간격에 모든 요소를 맞춘다 (항목 = 2줄 = 64px) */
+  :root {
+    --paper: #fdfbf3; --rule: #dfe7f1; --margin: #f2a7a7; --ink: #1d1d1f; --sub: #8a8a8e;
+    --hl: #fff27a; --red: #e5484d; --blue: #2f6fd6; --pencil: #6b7c99;
+    --hand: "Gaegu", "Nanum Pen Script", cursive;
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  html { background: var(--paper); }
+  body {
+    margin: 0; color: var(--ink);
+    font: 14px/1.4 -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+  }
+  /* 펼친 노트: 왼쪽 = 플래너 달력(모눈), 오른쪽 = 줄 노트 */
+  .spread { display: flex; min-height: 100vh; }
+  .page-cal {
+    width: 330px; flex: none; position: sticky; top: 0; height: 100vh; overflow: auto; padding: 0 18px 24px 22px;
+    background: radial-gradient(circle, #d9dee8 1px, transparent 1.2px) 0 0 / 16px 16px, #fbf9f1;
+    box-shadow: inset -14px 0 18px -14px rgba(0,0,0,.18);
+  }
+  .page-list {
+    flex: 1; min-width: 0; position: relative; padding: 0 20px 64px 54px;
+    background: repeating-linear-gradient(var(--paper) 0 31px, var(--rule) 31px 32px);
+    box-shadow: inset 12px 0 16px -12px rgba(0,0,0,.14);
+  }
+  .page-list::before { content: ""; position: absolute; left: 40px; top: 0; bottom: 0; width: 1.5px; background: var(--margin); }
+  /* 메모: 노란 떡메모지 */
+  .page-memo {
+    width: 320px; flex: none; position: sticky; top: 0; height: 100vh; display: flex; flex-direction: column;
+    padding: 0 18px 16px 20px; background: #fff7cf; box-shadow: inset 12px 0 16px -12px rgba(0,0,0,.16);
+  }
+  .memo-head { height: 64px; flex: none; display: flex; align-items: flex-end; gap: 8px; padding-bottom: 6px; }
+  .memo-head b { font: 700 26px/1 "Gowun Batang", serif; }
+  .memo-head span { margin-left: auto; font: 700 14px var(--hand); color: #a8986a; }
+  #memo {
+    flex: 1; width: 100%; border: 0; outline: 0; resize: none; padding: 0 2px; margin: 0; color: #2a2a2a;
+    font: 700 19px/32px var(--hand); background: repeating-linear-gradient(transparent 0 31px, #efdf9c 31px 32px);
+    background-attachment: local;
+  }
+  #memo::placeholder { color: #c4b57f; }
+  /* 스크롤 분리 — 메모·달력 끝까지 굴려도 메인으로 번지지 않고, 넓은 창에선 메인도 제 상자 안에서만 스크롤 */
+  #memo, .page-cal { overscroll-behavior: contain; }
+  @media (min-width: 1061px) {
+    .spread { height: 100vh; overflow: hidden; }
+    .page-list { height: 100vh; overflow-y: auto; overscroll-behavior: contain; }
+  }
+
+  @media (max-width: 1060px) {
+    .spread { display: grid; grid-template-columns: 330px 1fr; }
+    .page-cal { grid-row: span 2; }
+    .page-memo { width: auto; position: static; height: 420px; }
+  }
+  @media (max-width: 680px) {
+    .spread { display: flex; flex-direction: column; }
+    .page-cal { width: auto; position: static; height: auto; box-shadow: inset 0 -14px 18px -14px rgba(0,0,0,.18); }
+  }
+
+  /* 달력 */
+  .cal-head { height: 64px; display: flex; align-items: flex-end; padding-bottom: 8px; gap: 6px; }
+  .cal-head b { font: 700 26px/1 "Gowun Batang", serif; }
+  .cal-head button { border: 0; background: none; font: 700 22px var(--hand); color: var(--pencil); cursor: pointer; padding: 0 4px; }
+  .cal-head button:hover { color: var(--ink); }
+  .cal-head .nav { margin-left: auto; }
+  .cal { display: grid; grid-template-columns: 26px repeat(7, 1fr); row-gap: 4px; }
+  .cal .dow { font: 700 14px var(--hand); color: var(--sub); text-align: center; padding-bottom: 4px; }
+  .cal .dow.sun { color: var(--red); }
+  .cal .wk { font: 700 13px var(--hand); color: var(--blue); display: flex; align-items: center; justify-content: flex-end; padding-right: 4px; opacity: .8; }
+  .cal .day { position: relative; height: 42px; text-align: center; cursor: pointer; border-radius: 8px; padding-top: 5px; }
+  .cal .day:hover { background: rgba(0,0,0,.04); }
+  .cal .day .n { position: relative; z-index: 1; font: 700 17px var(--hand); display: inline-block; min-width: 26px; }
+  .cal .day.sun .n { color: var(--red); }
+  .cal .day.out .n { opacity: .25; }
+  .cal .day.past .n { opacity: .45; }
+  .cal .day.has .n::before { content: ""; position: absolute; inset: 4px -2px 1px; background: var(--hl); z-index: -1; border-radius: 4px; transform: rotate(-4deg); }
+  .cal .day.today .n::after { content: ""; position: absolute; inset: -5px -3px -3px; border: 2px solid var(--red); border-radius: 50%; transform: rotate(-10deg); }
+  .cal .day.sel { background: rgba(47,111,214,.09); }
+  .cal .dots { display: flex; gap: 2px; justify-content: center; margin-top: 2px; }
+  .cal .dots i { width: 5px; height: 5px; border-radius: 50%; }
+  /* 기간 막대: 오늘 → 마감일 (과목색 화살표). 주가 바뀌면 다음 줄로 이어진다 */
+  .cal .lanes { grid-column: 2 / 9; position: relative; margin-top: -6px; }
+  .cal .bar { position: absolute; height: 15px; border-radius: 8px 0 0 8px; cursor: pointer; display: flex; align-items: center;
+              font: 700 11px/1 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; color: #fff;
+              padding-left: 6px; white-space: nowrap; overflow: visible; }
+  .cal .bar.cont { border-radius: 0; padding-left: 4px; }                       /* 앞 주에서 이어짐 */
+  .cal .bar.end::after { content: ""; position: absolute; right: -7px; top: 0; border: 7.5px solid transparent;
+                         border-right: 0; border-left: 7px solid var(--c); }       /* 마감일 = 화살촉 */
+  .cal .bar:not(.end) { border-top-right-radius: 0; border-bottom-right-radius: 0; }
+  .cal .bar span { overflow: hidden; text-overflow: ellipsis; max-width: 100%; text-shadow: 0 0 2px rgba(0,0,0,.25); }
+  .cal .bar:hover { filter: brightness(1.08); }
+  .picked { margin-top: 18px; border-top: 1.5px dashed #cfd5e0; padding-top: 10px; }
+  .picked h3 { margin: 0 0 6px; font: 700 18px var(--hand); }
+  .picked h3 span { color: var(--sub); }
+  .picked div { font-size: 12.5px; padding: 3px 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .picked div.done { color: #aaa; text-decoration: line-through; }
+  .picked .none { font: 700 15px var(--hand); color: var(--sub); }
+
+  header { height: 64px; display: flex; align-items: flex-end; padding-bottom: 6px; gap: 8px; }
+  h1 { font: 700 30px/1 "Gowun Batang", serif; margin: 0; }
+  h1 mark { background: none; color: inherit; position: relative; z-index: 0; }
+  h1 mark::after { content: ""; position: absolute; left: -4px; right: -6px; bottom: 1px; height: 14px;
+    background: var(--hl); z-index: -1; transform: rotate(-1.5deg); border-radius: 3px; }
+  .date { font: 700 18px var(--hand); color: var(--sub); }
+
+  .sync { height: 32px; display: flex; align-items: center; gap: 8px; font: 700 15px var(--hand); color: var(--sub); }
+  .sync.bad { color: var(--red); }
+  .refresh { margin-left: auto; border: 0; background: none; font: 700 18px var(--hand); color: var(--pencil); cursor: pointer; padding: 0 4px; }
+  .refresh:hover { color: var(--ink); }
+
+  .sec { height: 32px; line-height: 34px; font: 700 17px/34px var(--hand); color: var(--blue); margin-top: 32px; }
+
+  .it { height: 64px; display: flex; align-items: center; gap: 11px; position: relative; }
+  .it input {
+    appearance: none; -webkit-appearance: none; margin: 0; flex: none; cursor: pointer;
+    width: 17px; height: 17px; border: 2px solid #333; border-radius: 3px; transform: rotate(-3deg); background: transparent;
+  }
+  .it input:checked { background: #333; box-shadow: inset 0 0 0 2px var(--paper); }
+  .body { min-width: 0; flex: 1; }
+  .line1, .s { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .tag { font-size: 11px; font-weight: 700; margin-right: 5px; }
+  .t { font-weight: 600; }
+  .t.star { background: linear-gradient(transparent 58%, var(--hl) 58%); }
+  .t mark { background: var(--hl); color: inherit; }
+  .s { font-size: 12px; color: var(--sub); }
+  .it.done .t { text-decoration: line-through 2px var(--red); color: #999; background: none; }
+  .it.done .tag { opacity: .5; }
+
+  .dd { position: absolute; left: -52px; width: 40px; text-align: center; font: 700 17px var(--hand);
+        color: var(--pencil); transform: rotate(-8deg); }
+  .dd.near { color: #e8590c; }
+  .dd.soon, .dd.over { color: var(--red); }
+  .dd.over { text-decoration: underline wavy; }
+
+  .empty, .note { height: 32px; line-height: 34px; font: 700 17px/34px var(--hand); color: var(--sub); }
+  .note { margin-top: 32px; }
+
+  /* 인덱스 탭 [할 일 | 중간고사] */
+  .tabs { margin-left: auto; display: flex; gap: 4px; align-self: flex-end; }
+  .tabs button {
+    border: 1.5px solid #d9d4c2; border-bottom: 0; border-radius: 9px 9px 0 0; background: #f3efe2; cursor: pointer;
+    font: 700 16px var(--hand); color: var(--sub); padding: 3px 12px 2px; transform: translateY(6px);
+  }
+  .tabs button.on { background: var(--hl); color: var(--ink); border-color: #e9d85a; }
+
+  /* 중간고사 목록 */
+  .course { margin-top: 32px; }
+  .course h2 { height: 32px; margin: 0; font: 700 19px/34px var(--hand); }
+  .doc { height: 64px; display: flex; align-items: center; gap: 10px; cursor: pointer; }
+  .doc:hover .dt { background: linear-gradient(transparent 58%, var(--hl) 58%); }
+  .doc .ico { width: 17px; height: 21px; border: 2px solid #333; border-radius: 2px 7px 2px 2px; flex: none; transform: rotate(-3deg);
+              background: repeating-linear-gradient(transparent 0 4px, #bbb 4px 5px) 3px 5px / 9px 11px no-repeat; }
+  .doc .dt { font-weight: 600; }
+  .doc .dm { font-size: 12px; color: var(--sub); }
+  .doc .qn { margin-left: auto; font: 700 15px var(--hand); color: var(--pencil); flex: none; }
+  .doc .one { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .course h2 .dm { font: 12px -apple-system, sans-serif; color: var(--sub); margin-left: 6px; }
+  .pending { height: 32px; line-height: 34px; font: 700 16px/34px var(--hand); color: #b9b2a0; }
+
+  /* 자료 탭 — 원본(PDF·PPTX·HWP·코드)을 앱 안에서 그대로 */
+  .wk { font: 700 14px var(--hand); color: var(--pencil); width: 44px; flex: none; }
+  .doc .ext { font: 700 11px/1 -apple-system, sans-serif; letter-spacing: .04em; padding: 3px 5px; border-radius: 4px; flex: none;
+              background: #eef1f6; color: var(--pencil); text-transform: uppercase; }
+  .doc .ext.pdf { background: #fde8e8; color: #c0392b; } .doc .ext.pptx { background: #fdebd9; color: #c4561a; }
+  .doc .ext.hwp, .doc .ext.hwpx { background: #e3eefc; color: #2f6fd6; }
+  body.wide .page-cal, body.wide .page-memo { display: none; }
+  body.wide .spread { display: block; }   /* 좁은 창의 grid(330px 1fr) 가 자료를 왼쪽 330px 칸에 가두지 않게 */
+  body.wide .page-list { padding-left: 54px; padding-bottom: 0; }
+  /* 자료 보기 = 창 높이를 꽉 채운 스크롤 상자. 창을 줄이면 상자도 줄고, 맞춤 모드면 배율도 다시 계산 */
+  .matview { display: flex; flex-direction: column; height: calc(100vh - 64px); padding: 8px 0 12px; }
+  .matview .reader-top { flex-wrap: wrap; row-gap: 4px; }
+  .matview .reader-top b { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; flex: 1 1 120px; }
+  .zbar { display: flex; align-items: center; gap: 4px; margin-left: auto; flex: none; }
+  .zbar button { border: 1.5px solid #d9d4c2; background: #fff; border-radius: 8px; font: 700 15px var(--hand); padding: 1px 9px; cursor: pointer; color: var(--ink); }
+  .zbar button:hover { border-color: #b9b2a0; }
+  .zbar button.on { background: var(--hl); border-color: #e9d85a; }
+  .zbar .pct { min-width: 52px; text-align: center; font: 700 15px var(--hand); color: var(--pencil); cursor: pointer; }
+  .zbar .sep { width: 6px; }
+  .viewer { margin-top: 6px; flex: 1; min-height: 0; overflow: auto; border-radius: 6px; }
+  .viewer.paged { background: #e9e6dc; border: 1px solid #e3dfd2; }
+  .viewer .pages { display: flex; flex-direction: column; align-items: center; gap: 12px; padding: 12px; width: max-content; min-width: 100%; }
+  .viewer .pg { background: #fff; box-shadow: 0 1px 4px rgba(0,0,0,.18); flex: none; }
+  .viewer .pg canvas { display: block; width: 100%; height: 100%; }
+  .viewer .pptx { padding: 12px; width: max-content; min-width: 100%; }
+  .viewer .pptx > div { margin: 0 auto; }
+  /* pptx-preview 기본값(검은 배경·고정 높이 스크롤 상자) 대신 슬라이드를 세로로 죽 이어 붙인다 */
+  .viewer .pptx-preview-wrapper { height: auto !important; overflow: visible !important; background: none !important; }
+  .viewer .pptx-preview-slide-wrapper { margin: 0 auto 14px !important; box-shadow: 0 1px 4px rgba(0,0,0,.18); }
+  .viewer pre.txt { white-space: pre-wrap; word-break: break-word; background: #fff; border: 1px solid #e3dfd2; border-radius: 6px;
+                    padding: 28px 32px; font: 14.5px/1.8 -apple-system, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif; max-width: 860px; }
+  .viewer pre.code { white-space: pre; overflow-x: auto; background: #fbfaf5; border: 1px solid #e3dfd2; border-radius: 6px;
+                     padding: 16px 18px; font: 13px/1.6 "SF Mono", Menlo, Consolas, monospace; }
+  .viewer .warn { font-size: 12px; color: var(--sub); margin: 0 0 8px; }
+
+  /* 문서 읽기 — 줄 노트 대신 무지 종이 */
+  .page-list.reading { background: var(--paper); }
+  .reader { padding-top: 16px; max-width: 760px; }
+  .back { border: 0; background: none; font: 700 17px var(--hand); color: var(--blue); cursor: pointer; padding: 0; }
+  .reader-top { display: flex; align-items: center; gap: 10px; position: sticky; top: 0; background: var(--paper); padding: 8px 0; z-index: 2; }
+  .reader-top .all { margin-left: auto; border: 1.5px solid #d9d4c2; background: #fff; border-radius: 8px; font: 700 15px var(--hand); padding: 2px 10px; cursor: pointer; }
+  .reader h1.title { font: 700 26px/1.3 "Gowun Batang", serif; margin: 8px 0 16px; }
+  .reader h1.title mark { background: linear-gradient(transparent 60%, var(--hl) 60%); }
+  .md { line-height: 1.7; font-size: 14.5px; }
+  .md h2 { font: 700 21px/1.35 "Gowun Batang", serif; margin: 34px 0 10px; padding-bottom: 4px; border-bottom: 1.5px solid var(--rule); }
+  .md h3 { font-size: 16px; margin: 22px 0 8px; }
+  .md mark { background: linear-gradient(transparent 50%, var(--hl) 50%); color: inherit; padding: 0 1px; }
+  .md code { font: 13px "SF Mono", Menlo, Consolas, monospace; background: #f1eee3; padding: 1px 5px; border-radius: 4px; }
+  .md pre { background: #1f1f22; color: #f2f2f2; padding: 12px 14px; border-radius: 10px; overflow: auto; }
+  .md pre code { background: none; color: inherit; padding: 0; }
+  .md pre { position: relative; }
+  .md pre .copy { position: absolute; top: 6px; right: 6px; border: 0; border-radius: 6px; background: #3a3a40; color: #f2f2f2; font: 12px var(--hand, sans-serif); padding: 2px 9px; cursor: pointer; }
+  .md pre .copy:hover { background: var(--hl); color: var(--ink); }
+  .md table { border-collapse: collapse; margin: 10px 0; font-size: 13.5px; display: block; overflow-x: auto; }
+  .md th, .md td { border: 1px solid #e4dfcf; padding: 6px 9px; text-align: left; vertical-align: top; }
+  .md th { background: #f5f1e3; }
+  .md blockquote { margin: 10px 0; padding: 6px 12px; border-left: 3px solid var(--hl); background: #fffbe3; color: #555; }
+  .md ul, .md ol { padding-left: 22px; }
+  .q { border: 1.5px solid #ebe5d2; border-radius: 12px; padding: 4px 16px 10px; margin: 16px 0; background: #fffefa; }
+  .q > h3.qh { font: 700 17px var(--hand); color: var(--blue); margin: 10px 0 2px; }
+  .q details { margin-top: 8px; border-top: 1.5px dashed #e4dfcf; padding-top: 6px; }
+  .q summary { cursor: pointer; font: 700 16px var(--hand); color: var(--red); list-style: none; }
+  .q summary::before { content: "▸ "; }
+  .q details[open] summary::before { content: "▾ "; }
+
+  /* 풀기 모드 */
+  .seg { display: inline-flex; border: 1.5px solid #d9d4c2; border-radius: 9px; overflow: hidden; margin-left: 10px; }
+  .seg button { border: 0; background: #fff; font: 700 15px var(--hand); padding: 2px 12px; cursor: pointer; color: var(--sub); }
+  .seg button.on { background: var(--hl); color: var(--ink); }
+  .score { position: sticky; top: 46px; z-index: 1; background: var(--paper); padding: 6px 0 8px; font: 700 18px var(--hand); display: flex; flex-wrap: wrap; align-items: center; gap: 6px 8px; white-space: nowrap; }
+  .score b { font-size: 24px; color: var(--red); }
+  .score span { color: var(--sub); }
+  .score .mini:first-of-type { margin-left: auto; }
+  .mini { border: 1.5px solid #d9d4c2; background: #fff; border-radius: 7px; font: 700 14px var(--hand); padding: 1px 9px; cursor: pointer; white-space: nowrap; }
+  .mini:hover { background: var(--hl); }
+  .opts { display: grid; gap: 6px; margin: 10px 0 4px; }
+  .opts.ox { grid-template-columns: 90px 90px; }
+  .opt { display: flex; gap: 10px; align-items: flex-start; text-align: left; border: 1.5px solid #e4dfcf; background: #fff; border-radius: 10px;
+         padding: 8px 12px; cursor: pointer; font: inherit; color: inherit; line-height: 1.5; }
+  .opt b { font: 700 17px var(--hand); flex: none; }
+  .opt:hover:not([disabled]) { border-color: var(--pencil); }
+  .opt.sel { border-color: var(--blue); background: #eef4ff; }
+  .opt.right { border-color: #2f9e44; background: #ebfbee; }
+  .opt.wrong { border-color: var(--red); background: #fff0f0; text-decoration: line-through; text-decoration-color: var(--red); }
+  .opt.dim { opacity: .5; }
+  .opt[disabled] { cursor: default; }
+  .opts.ox .opt { justify-content: center; } .opts.ox .opt b { font-size: 24px; }
+  .myans { width: 100%; min-height: 60px; margin: 8px 0 6px; border: 1.5px solid #e4dfcf; border-radius: 10px; padding: 8px 10px;
+           font: 700 17px/1.5 var(--hand); background: #fffdf3; resize: vertical; outline: 0; }
+  .mine { font: 700 16px var(--hand); color: var(--pencil); margin: 6px 0; }
+  .hint { font: 700 15px var(--hand); color: var(--sub); margin: 6px 0; }
+  .verdict { font: 700 15px var(--hand); margin-left: 6px; padding: 0 6px; border-radius: 5px; }
+  .verdict.ok { color: #2f9e44; background: #ebfbee; } .verdict.no { color: var(--red); background: #fff0f0; }
+  .q.quiz.is-ok { border-color: #b2e2bc; } .q.quiz.is-no { border-color: #f5b5b5; }
+  .answer { margin-top: 8px; border-top: 1.5px dashed #e4dfcf; padding-top: 6px; }
+
+  /* 개념 탭 — Obsidian 식: 검색·목록 | 개념 페이지 | 연결 지도·역링크. 정본 = <과목>/개념/*.md */
+  .cx { display: grid; grid-template-columns: 250px minmax(0, 1fr) 300px; gap: 26px; height: calc(100vh - 64px); padding-top: 8px; }
+  .cx > div { overflow-y: auto; overscroll-behavior: contain; padding-bottom: 40px; }
+  .cx-search { width: 100%; border: 1.5px solid #d9d4c2; border-radius: 10px; padding: 7px 11px; font: 700 17px var(--hand); background: #fff; outline: 0; }
+  .cx-search:focus { border-color: var(--blue); }
+  .cx-hint { font: 700 13px var(--hand); color: var(--sub); margin: 5px 2px 6px; }
+  .cx-grp { font: 700 15px var(--hand); margin: 14px 0 3px; }
+  .cx-item { display: flex; align-items: baseline; gap: 6px; padding: 4px 8px; border-radius: 8px; cursor: pointer; }
+  .cx-item:hover { background: rgba(0,0,0,.045); }
+  .cx-item.on { background: rgba(47,111,214,.11); }
+  .cx-item b { font-size: 14px; font-weight: 600; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .cx-item small { color: var(--sub); font-size: 11.5px; margin-left: auto; white-space: nowrap; }
+  .cx-item.stub b { color: #b07a2a; font-weight: 500; }
+  .cx-snip { font-size: 12px; color: var(--sub); padding: 0 8px 6px; line-height: 1.45; }
+  .cx-snip mark { background: var(--hl); color: inherit; }
+  .cx-trail { font: 700 15px var(--hand); color: var(--sub); min-height: 24px; }
+  .cx-trail a { color: var(--pencil); cursor: pointer; } .cx-trail a:hover { color: var(--ink); text-decoration: underline; }
+  .cx-trail b { color: var(--ink); }
+  .cx-title { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 10px 0 2px; }
+  .cx-title h1 { font: 700 30px/1.25 "Gowun Batang", serif; margin: 0; background: linear-gradient(transparent 58%, var(--hl) 58%); padding: 0 4px; }
+  .cx-title .al { color: var(--sub); font-size: 13px; }
+  .cx-pill { font: 700 11.5px/1 -apple-system, sans-serif; color: #fff; padding: 4px 8px; border-radius: 99px; }
+  .cx-def { margin: 14px 0 6px; padding: 12px 16px; background: #fff; border-left: 4px solid var(--hl); border-radius: 0 10px 10px 0; box-shadow: 0 1px 3px rgba(0,0,0,.06); }
+  .cx-def .lab { font: 700 13px var(--hand); color: var(--sub); }
+  .cx-def .md { font-size: 15.5px; font-weight: 600; } .cx-def .md p { margin: 2px 0; }
+  .cx-h { font: 700 19px var(--hand); color: var(--blue); margin: 24px 0 6px; }
+  a.wl { color: var(--blue); font-weight: 600; cursor: pointer; text-decoration: none; border-bottom: 1.5px dashed rgba(47,111,214,.45); }
+  a.wl:hover { background: rgba(47,111,214,.08); }
+  a.wl.stub { color: #b07a2a; border-bottom-color: rgba(176,122,42,.5); }
+  a.wl.stub::after { content: "?"; font-size: 10px; vertical-align: super; }
+  .cx-src { display: flex; gap: 10px; align-items: baseline; padding: 7px 12px; margin-bottom: 6px; background: #fff; border-radius: 8px; cursor: pointer; border: 1px solid #eceef2; }
+  .cx-src:hover { border-color: var(--blue); }
+  .cx-src .ty { font: 700 13px var(--hand); color: var(--pencil); width: 34px; flex: none; }
+  .cx-src b { font-weight: 600; font-size: 13.5px; min-width: 0; }
+  .cx-src small { margin-left: auto; color: var(--sub); white-space: nowrap; }
+  .cx-stub { margin-top: 18px; padding: 14px 16px; border: 2px dashed #e0c58f; border-radius: 12px; background: #fffaf0; }
+  .cx-stub h3 { margin: 0 0 6px; font: 700 18px var(--hand); color: #b07a2a; }
+  .cx-map { background: #fff7cf; border-radius: 14px; padding: 12px 14px 20px !important; align-self: start; max-height: calc(100vh - 80px); }
+  .cx-map > b { font: 700 22px/1 "Gowun Batang", serif; }
+  .cx-map svg { width: 100%; height: 270px; margin-top: 8px; background: rgba(255,255,255,.6); border-radius: 12px; }
+  .cx-map svg text { font: 700 12.5px -apple-system, "Apple SD Gothic Neo", sans-serif; cursor: pointer; }
+  .cx-map svg g:hover circle { stroke-width: 3; }
+  .cx-map h4 { font: 700 16px var(--hand); margin: 14px 0 4px; color: #8a7a3c; }
+  .cx-map .lg { font: 700 12.5px var(--hand); color: #a8986a; margin-top: 4px; }
+  .cx-bl { font-size: 12.5px; padding: 6px 0; border-bottom: 1px dashed #e6d78f; line-height: 1.5; }
+  .cx-bl a { cursor: pointer; color: var(--blue); font-weight: 600; } .cx-bl span { color: #6b6141; }
+  @media (max-width: 1150px) { .cx { grid-template-columns: 220px minmax(0, 1fr); } .cx-map { display: none; } }
+  @media (max-width: 720px) { .cx { display: block; height: auto; } .cx > div { overflow: visible; } }
+</style>
+</head>
+<body>
+<div class="spread">
+<aside class="page-cal">
+  <div class="cal-head"><b id="cal-m"></b><button class="nav" id="prev" title="이전 달">‹</button><button id="next" title="다음 달">›</button></div>
+  <div class="cal" id="cal"></div>
+  <div class="picked" id="picked"></div>
+</aside>
+<main class="page-list">
+<header><h1><mark id="h"></mark></h1><span class="date" id="d"></span>
+  <nav class="tabs"><button data-v="todo">할 일</button><button data-v="notes">강의노트</button><button data-v="study">중간고사</button><button data-v="mat">자료</button><button data-v="concept">개념</button></nav></header>
+<div class="sync" id="sync"><span id="syncmsg"></span><button class="refresh" id="refresh" title="git pull 후 새로고침">↻ 새로고침</button></div>
+
+<section id="view-todo">
+<div class="sec">마감 임박 ↓</div>
+<div id="due"></div>
+<div class="sec" id="wk-h">이번 주 그 외</div>
+<div id="week"></div>
+<div class="note" id="note" hidden></div>
+</section>
+<section id="view-notes" hidden></section>
+<section id="view-study" hidden></section>
+<section id="view-mat" hidden></section>
+<section id="view-concept" hidden></section>
+</main>
+<aside class="page-memo">
+  <div class="memo-head"><b>메모</b><span id="memo-st"></span></div>
+  <textarea id="memo" spellcheck="false" placeholder="아무거나 적어두기 — 노트북과 같이 보임"></textarea>
+</aside>
+</div>
+
+<script src="/vendor/marked.min.js"></script>
+<script>
+const $ = id => document.getElementById(id);
+const DAYS = "일월화수목금토";
+let data = null;
+
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const fmt = s => esc(s).replace(/\*\*(.+?)\*\*/g, "$1").replace(/==(.+?)==/g, "<mark>$1</mark>");
+
+function dueDate(it) {
+  if (!it.due) return null;
+  const [d, t] = it.due.split(" ");
+  return new Date(`${d}T${t || "23:59"}:00`);
+}
+function dayOf(due) { const b = new Date(due - 60000); b.setHours(0, 0, 0, 0); return b; }   // '10-19 00:00' = 10-18 자정
+function dayDiff(due) {
+  const a = new Date(); a.setHours(0, 0, 0, 0);
+  return Math.round((dayOf(due) - a) / 864e5);
+}
+
+function row(it) {
+  const el = document.createElement("div");
+  el.className = "it" + (it.done ? " done" : "");
+  el.title = it.text;
+  const [title, ...rest] = it.text.split(" — ");
+  const star = title.includes("⭐");
+  let badge = "";
+  const due = dueDate(it);
+  if (due && !it.done) {
+    const n = dayDiff(due), over = due < new Date();
+    const cls = over ? "over" : n <= 1 ? "soon" : n <= 3 ? "near" : "";
+    badge = `<span class="dd ${cls}">${over ? "지남" : n === 0 ? "오늘" : `D-${n}`}</span>`;
+  }
+  el.innerHTML = `${badge}<input type="checkbox" ${it.done ? "checked" : ""}>
+    <div class="body">
+      <div class="line1"><span class="tag" style="color:hsl(${it.hue} 55% 40%)">${esc(it.slug)}</span><span class="t ${star ? "star" : ""}">${fmt(title.replace("⭐", "").trim())}</span></div>
+      <div class="s">${rest.length ? fmt(rest.join(" — ")) : "&nbsp;"}</div>
+    </div>`;
+  el.querySelector("input").onchange = e => toggle(it, e.target.checked, el);
+  return el;
+}
+const empty = msg => Object.assign(document.createElement("div"), {className: "empty", textContent: msg});
+
+function render() {
+  const today = new Date(data.today + "T00:00:00");
+  $("h").textContent = `${data.week}주차`;
+  $("d").textContent = `${today.getMonth() + 1}/${today.getDate()} ${DAYS[today.getDay()]}`;
+  $("syncmsg").textContent = data.sync;
+  $("sync").classList.toggle("bad", !data.ok);
+
+  // 마감 임박: 미완료 + 마감 있음 + 3일 전 지남 ~ 14일 이내 (어느 주차 파일이든)
+  const urgent = data.items.filter(it => {
+    if (it.done || !it.due) return false;
+    const n = dayDiff(dueDate(it));
+    return n >= -3 && n <= 14;
+  }).sort((a, b) => dueDate(a) - dueDate(b));
+  const shown = new Set(urgent);
+  const week = data.items.filter(it => it.week === data.week && !shown.has(it)).sort((a, b) => a.done - b.done);
+
+  $("due").replaceChildren(...(urgent.length ? urgent.map(row) : [empty("2주 안에 마감 없음 ✓")]));
+  $("wk-h").textContent = `이번 주 그 외 (${data.week}주차)`;
+  $("week").replaceChildren(...(week.length ? week.map(row) : [empty("없음")]));
+
+  // 손글씨 메모: 아직 안 지난 마감이 한 날에 3개 이상 몰리면 경고
+  const byDay = {};
+  urgent.filter(it => dueDate(it) > new Date()).forEach(it => {
+    const k = dayOf(dueDate(it)).getTime(); byDay[k] = (byDay[k] || 0) + 1;
+  });
+  const [k, n] = Object.entries(byDay).sort((a, b) => b[1] - a[1])[0] || [];
+  $("note").hidden = !(n >= 3);
+  if (n >= 3) {
+    const d = new Date(+k), prev = DAYS[(d.getDay() + 6) % 7];
+    $("note").textContent = `✎ ${d.getMonth() + 1}/${d.getDate()}(${DAYS[d.getDay()]})에 ${n}개 몰림 — ${prev}요일 전에 끝내기`;
+  }
+}
+
+// ── 달력: 월요일 시작(학기 주차와 줄 맞춤), 마감 있는 날 = 형광펜 + 과목색 점 ──
+const SEM = () => new Date((data.semesterStart || "2026-08-31") + "T00:00:00");   // config.json semester_start
+let calMonth = null, picked = null;
+const key = d => `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+
+const SHORT = s => (data.short || {})[s] || s;   // config.json courses[].short
+function renderCal() {
+  const today = new Date(data.today + "T00:00:00");
+  if (!calMonth) calMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+  if (!picked) {   // 기본 선택 = 오늘 이후 가장 가까운 마감일, 없으면 오늘
+    const next = data.items.filter(it => it.due && !it.done && dueDate(it) > new Date()).map(it => dayOf(dueDate(it))).sort((a, b) => a - b)[0];
+    picked = next || today;
+  }
+  const byDay = {};
+  data.items.forEach(it => { if (it.due) (byDay[key(dayOf(dueDate(it)))] ||= []).push(it); });
+  // 막대 = 안 끝난 항목을 (과목, 마감일) 로 묶은 것. 오늘부터 마감일까지
+  const groups = {};
+  data.items.forEach(it => {
+    if (!it.due || it.done) return;
+    const end = dayOf(dueDate(it)); if (end < today) return;
+    (groups[it.slug + "|" + key(end)] ||= { slug: it.slug, hue: it.hue, end, n: 0 }).n++;
+  });
+  const bars = Object.values(groups).sort((a, b) => a.end - b.end || a.slug.localeCompare(b.slug));
+
+  $("cal-m").textContent = `${calMonth.getMonth() + 1}월`;
+  const start = new Date(calMonth); start.setDate(1 - (calMonth.getDay() + 6) % 7);
+  const cells = [..."월화수목금토일"].map((w, i) => `<div class="dow ${i === 6 ? "sun" : ""}">${w}</div>`);
+  cells.unshift("<div></div>");
+  for (let d = new Date(start); d <= new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0) || d.getDay() !== 1; ) {
+    const wk = Math.floor((d - SEM()) / 6048e5) + 1;
+    cells.push(`<div class="wk">${wk >= 1 && wk <= 16 ? wk + "주" : ""}</div>`);
+    const wkStart = new Date(d), wkEnd = new Date(d); wkEnd.setDate(wkEnd.getDate() + 6);
+    for (let i = 0; i < 7; i++, d.setDate(d.getDate() + 1)) {
+      const its = byDay[key(d)] || [], open = its.filter(it => !it.done);
+      const cls = ["day", i === 6 && "sun", d.getMonth() !== calMonth.getMonth() && "out", d < today && "past",
+                   open.length && d >= today && "has", +d === +today && "today", key(d) === key(picked) && "sel"].filter(Boolean).join(" ");
+      // 점은 막대가 없는 것만: 완료(흐리게) · 지난 미완료
+      const dots = its.filter(it => it.done || d < today).slice(0, 4)
+        .map(it => `<i style="background:hsl(${it.hue} 60% ${it.done ? 82 : 52}%)"></i>`).join("");
+      cells.push(`<div class="${cls}" data-t="${+d}"><span class="n">${d.getDate()}</span><div class="dots">${dots}</div></div>`);
+    }
+    const segs = bars.filter(b => b.end >= wkStart && today <= wkEnd);
+    if (segs.length) {
+      const day = x => Math.round((x - wkStart) / 864e5);
+      cells.push(`<div class="lanes" style="height:${segs.length * 17 + 4}px">` + segs.map((b, lane) => {
+        const s0 = Math.max(0, day(today)), e0 = Math.min(6, day(b.end)), end = b.end <= wkEnd, cont = today < wkStart;
+        const label = SHORT(b.slug) + (b.n > 1 ? ` ${b.n}건` : "") + (end ? ` ~${b.end.getMonth() + 1}/${b.end.getDate()}` : "");
+        const c = `hsl(${b.hue} 58% 50%)`;
+        return `<div class="bar ${end ? "end" : ""} ${cont ? "cont" : ""}" data-t="${+b.end}" title="${esc(b.slug)} ${b.n}건 — ${b.end.getMonth() + 1}/${b.end.getDate()} 마감"
+          style="--c:${c};background:${c};top:${lane * 17}px;left:calc(${s0} / 7 * 100% + 3px);width:calc(${e0 - s0 + 1} / 7 * 100% - ${end ? 12 : 3}px)">
+          <span>${cont && !end ? "" : esc(label)}</span></div>`;
+      }).join("") + `</div>`);
+    }
+  }
+  $("cal").innerHTML = cells.join("");
+  $("cal").querySelectorAll(".day, .bar").forEach(el => el.onclick = () => { picked = new Date(+el.dataset.t); renderCal(); });
+
+  const its = (byDay[key(picked)] || []).sort((a, b) => a.done - b.done);
+  $("picked").innerHTML = `<h3>${picked.getMonth() + 1}/${picked.getDate()} (${DAYS[picked.getDay()]}) <span>마감 ${its.length}</span></h3>` +
+    (its.length ? its.map(it => `<div class="${it.done ? "done" : ""}"><span class="tag" style="color:hsl(${it.hue} 55% 40%)">${esc(it.slug)}</span>${fmt(it.text.split(" — ")[0].replace("⭐", "").trim())}</div>`).join("")
+                : `<div class="none">이 날은 비어 있음</div>`);
+}
+$("prev").onclick = () => { calMonth.setMonth(calMonth.getMonth() - 1); renderCal(); };
+$("next").onclick = () => { calMonth.setMonth(calMonth.getMonth() + 1); renderCal(); };
+
+async function load(force) {
+  try {
+    const r = await fetch("/api/todos" + (force ? "?force" : ""));
+    data = await r.json();
+    render();
+    renderCal();
+    if (!memoDirty && document.activeElement !== memo && memo.value !== data.memo) memo.value = data.memo;
+  } catch (e) {
+    $("syncmsg").textContent = "앱 서버가 꺼져 있음 — app.py 다시 실행";
+    $("sync").classList.add("bad");
+  }
+}
+
+async function toggle(it, done, el) {
+  el.classList.toggle("done", done);
+  const r = await fetch("/api/toggle", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({file: it.file, line: it.line, text: it.text, done})}).catch(() => null);
+  if (!r || !r.ok) {
+    const msg = r ? (await r.json()).error : "서버 응답 없음";
+    el.querySelector("input").checked = !done;
+    el.classList.toggle("done", !done);
+    $("syncmsg").textContent = "체크 실패: " + msg;
+    $("sync").classList.add("bad");
+    return;
+  }
+  setTimeout(() => load(false), 2500);   // push 결과(동기화 상태) 반영
+}
+
+// ── 메모: 입력 멈추고 0.4초 뒤 파일 저장 (git push 는 서버가 20초 모아서) ──
+const toTop = () => { window.scrollTo(0, 0); document.querySelector(".page-list").scrollTop = 0; };
+const memo = $("memo");
+let memoDirty = false, memoT = null;
+async function saveMemo() {
+  clearTimeout(memoT);
+  if (!memoDirty) return;
+  const text = memo.value;
+  const r = await fetch("/api/memo", {method: "POST", headers: {"Content-Type": "application/json"},
+    body: JSON.stringify({text})}).catch(() => null);
+  if (r && r.ok) {
+    if (memo.value === text) memoDirty = false;
+    $("memo-st").textContent = "저장됨";
+  } else $("memo-st").textContent = "저장 실패 — 서버 확인";
+}
+memo.addEventListener("input", () => {
+  memoDirty = true; $("memo-st").textContent = "쓰는 중…";
+  clearTimeout(memoT); memoT = setTimeout(saveMemo, 400);
+});
+memo.addEventListener("blur", saveMemo);
+window.addEventListener("pagehide", () => {
+  if (memoDirty) navigator.sendBeacon("/api/memo", JSON.stringify({text: memo.value}));
+});
+
+// ── 중간고사 탭: 과목별 모음 목록 → 문서 읽기 (시험지 형식 Q 는 정답 접힘) ──
+let view = "todo", openDoc = null, conceptBack = null, curConcept = null;
+try { view = localStorage.getItem("dash-view") || "todo"; } catch (e) {}
+// 과목별로 있어야 할 모음 [표시 이름, 제목에 들어갈 키워드] — 아직 없으면 '준비 중'
+const EXPECT = {};   // 과목별로 있어야 할 모음 {slug: [[표시 이름, 제목 키워드], …]} — 필요하면 채운다
+// 단일 ~ 는 범위 표기(1~6주차·12:00~14:30) — marked 가 취소선으로 먹지 않게 코드 밖에서만 이스케이프
+const tilde = t => t.split(/(```[\s\S]*?```|`[^`\n]*`)/).map((x, i) => i % 2 ? x : x.replace(/(?<!~)~(?!~)/g, "\\~")).join("");
+// Obsidian 콜아웃 `> [!tip]- 제목` → 접기(-)/펼침(+) <details>, 접기 표시 없으면 제목 붙은 인용
+function callouts(t, out) {
+  return t.replace(/^> \[!(\w+)\]([+-]?)[ \t]*(.*)\n?((?:>.*(?:\n|$))*)/gm, (_, type, fold, title, body) => {
+    const inner = mdHtml(body.replace(/^> ?/gm, "")), head = esc(title || type);
+    out.push(fold ? `<details class="callout"${fold === "+" ? " open" : ""}><summary>${head}</summary>${inner}</details>`
+                  : `<blockquote><p><b>${head}</b></p>${inner}</blockquote>`);
+    return `\n\u0000C${out.length - 1}\u0000\n\n`;
+  });
+}
+const mdHtml = t => {
+  if (!window.marked) return `<pre>${esc(t)}</pre>`;
+  const out = [], html = marked.parse(tilde(callouts(t, out)).replace(/==([^=\n]+)==/g, "<mark>$1</mark>"));
+  return html.replace(/(?:<p>)?\u0000C(\d+)\u0000(?:<\/p>)?/g, (_, i) => out[+i]);
+};
+
+function setView(v) {
+  view = v;
+  try { localStorage.setItem("dash-view", v); } catch (e) {}
+  document.querySelectorAll(".tabs button").forEach(b => b.classList.toggle("on", b.dataset.v === v));
+  $("view-todo").hidden = v !== "todo";
+  $("view-notes").hidden = v !== "notes";
+  $("view-study").hidden = v !== "study";
+  $("view-mat").hidden = v !== "mat";
+  $("view-concept").hidden = v !== "concept";
+  $("sync").hidden = v !== "todo" && !!openDoc;
+  document.querySelector(".page-list").classList.toggle("reading", v !== "todo" && !!openDoc);
+  document.body.classList.toggle("wide", (v === "mat" && !!openDoc) || v === "concept");
+  if (v === "concept") { $("sync").hidden = true; document.querySelector(".page-list").classList.add("reading"); loadConcepts(); }
+  if (v === "notes") openDoc ? showNote(openDoc) : loadNotes();
+  if (v === "study") openDoc ? showDoc(openDoc) : loadStudy();
+  if (v === "mat") openDoc ? showMat(openDoc) : loadMat();
+}
+document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => { closeMat(); openDoc = null; conceptBack = null; setView(b.dataset.v); });
+
+// ── 강의노트 탭: Record/summaries 요약 (사이트 '강의노트' 와 같은 데이터) — 과목별 최신 주차 위 ──
+// 제목 꼬리 '(🎙 영상 + 📄 자료 통합…)' · '— 7주차 2026-10-13' 은 주차·날짜 칸과 중복이라 뗀다
+const noteTitle = t => t.replace(/\s*—[^—]*\d{4}-\d{2}-\d{2}[^—]*$/, "").replace(/\s*\([^()]*[🎙📄][^()]*\)\s*$/u, "").trim() || t;
+async function loadNotes() {
+  const list = await (await fetch("/api/notes")).json();
+  $("view-notes").innerHTML = list.filter(c => c.notes.length).map(c =>
+    `<div class="course"><h2 style="color:hsl(${c.hue} 55% 38%)">${esc(c.name)} <span class="dm">${esc(c.prof)} · ${esc(c.when)}</span></h2>` +
+    c.notes.map((n, k) => `
+      <div class="doc" data-id="${esc(n.id)}"><span class="wk">${k && c.notes[k - 1].week === n.week ? "" : n.week + "주차"}</span>
+        <div style="min-width:0"><div class="dt one">${esc(noteTitle(n.title))}</div>${n.oneLiner ? `<div class="dm one">${esc(n.oneLiner.replace(/==|\*\*|`/g, ""))}</div>` : ""}</div>
+        <span class="qn">${n.date.slice(5)}</span></div>`).join("") + `</div>`
+  ).join("") || `<div class="empty">요약이 아직 없음</div>`;
+  $("view-notes").querySelectorAll(".doc").forEach(el => el.onclick = () => { toTop(); showNote(el.dataset.id); });
+}
+async function showNote(id) {
+  openDoc = id;
+  const n = await (await fetch("/api/note?id=" + encodeURIComponent(id))).json();
+  const md = n.error ? `> ${n.error}` : n.md.replace(/^# .+\n/, "");   // 제목은 위에 따로
+  $("view-notes").innerHTML = `<div class="reader">
+    <div class="reader-top"><button class="back">← 목록</button></div>
+    <div class="dm" style="color:var(--sub);font-size:12px">${esc(n.slug || "")} · ${n.week || "?"}주차 · ${esc(n.date || "")}</div>
+    <h1 class="title"><mark>${esc(noteTitle(n.title || id))}</mark></h1>
+    <div class="md">${mdHtml(md)}</div></div>`;
+  setViewChrome();
+  const back = $("view-notes").querySelector(".back");
+  if (conceptBack) back.textContent = "← " + conceptBack;          // 개념에서 '나온 곳'으로 들어왔으면 그 개념으로 돌아간다
+  back.onclick = () => { openDoc = null; if (conceptBack) { const c = conceptBack; conceptBack = null; curConcept = c; setView("concept"); } else setView("notes"); };
+}
+
+// ── 자료 탭: <과목>/materials 원본을 다운로드·외부 앱 없이 앱 안에서 본다 (원본은 읽기만) ──
+async function loadMat() {
+  const list = await (await fetch("/api/materials")).json();
+  $("view-mat").innerHTML = list.filter(c => c.items.length).map(c => {
+    const weeks = [...new Set(c.items.map(i => i.week))].sort((a, b) => b - a);   // 최신 주차 위
+    return `<div class="course"><h2 style="color:hsl(${c.hue} 55% 38%)">${esc(c.name)}</h2>` + weeks.map(w =>
+      c.items.filter(i => i.week === w).map((i, k) => `
+        <div class="doc" data-p="${esc(i.path)}"><span class="wk">${k ? "" : (w ? w + "주차" : "")}</span>
+          <span class="ext ${i.ext}">${i.ext}</span><div class="dt">${esc(i.name)}</div>
+          <span class="qn">${i.kb > 1024 ? (i.kb / 1024).toFixed(1) + "MB" : i.kb + "KB"}</span></div>`).join("")).join("") + `</div>`;
+  }).join("") || `<div class="empty">materials/ 에 자료가 없음</div>`;
+  $("view-mat").querySelectorAll(".doc").forEach(el => el.onclick = () => { toTop(); showMat(el.dataset.p); });
+}
+
+let pptxLib = null, pdfLib = null;
+function loadScript(src) {
+  return new Promise((ok, no) => {
+    const s = document.createElement("script"); s.src = src;
+    s.onload = ok; s.onerror = no; document.head.appendChild(s);
+  });
+}
+const loadPptxLib = () => pptxLib ||= loadScript("/vendor/pptx-preview.umd.js").then(() => window.pptxPreview);
+// pdf.js — 웹뷰 내장 PDF 뷰어는 JS 로 배율을 못 잡아서 직접 그린다. cmaps 가 있어야 한글 CID 폰트가 안 빠진다
+const PDFJS = "/vendor/pdfjs/";
+const loadPdfLib = () => pdfLib ||= loadScript(PDFJS + "pdf.min.js").then(() => {
+  pdfjsLib.GlobalWorkerOptions.workerSrc = PDFJS + "pdf.worker.min.js"; return pdfjsLib;
+});
+
+// ── 자료 배율: 가로 맞춤(fitW) / 세로 맞춤(fitH, 한 쪽이 창 높이에 꼭 맞게) / 직접(±·⌘±·핀치) ──
+// base = 배율 1일 때 한 쪽(페이지·슬라이드) 크기. 맞춤 모드는 창 크기가 바뀔 때마다 다시 계산한다
+const Z = { mode: "fitW", scale: 1, base: null, apply: null, stop: null };
+try { Z.mode = localStorage.getItem("mat-fit") || "fitW"; } catch (e) {}
+function zoomTo(mode, scale) {
+  const v = $("viewer");
+  if (!v || !Z.apply) return;
+  if (mode !== "custom") {
+    if (!Z.base) return;
+    const W = v.clientWidth - 26, H = v.clientHeight - 26;
+    scale = mode === "fitW" ? W / Z.base.w : H / Z.base.h;
+    try { localStorage.setItem("mat-fit", mode); } catch (e) {}
+  }
+  scale = Math.min(5, Math.max(0.2, scale));
+  const mid = (v.scrollTop + v.clientHeight / 2) / (v.scrollHeight || 1);   // 보던 위치 유지
+  Z.mode = mode; Z.scale = scale; Z.apply(scale);
+  v.scrollTop = mid * v.scrollHeight - v.clientHeight / 2;
+  const bar = document.querySelector(".zbar");
+  if (bar) {
+    bar.querySelector(".pct").textContent = Math.round(scale * 100) + "%";
+    bar.querySelectorAll("[data-z]").forEach(b => b.classList.toggle("on", b.dataset.z === mode));
+  }
+}
+const zoomStep = dir => zoomTo("custom", Z.scale * (dir > 0 ? 1.2 : 1 / 1.2));
+function zoomBar(fit) {
+  return `<div class="zbar">
+    <button data-s="-1" title="축소 (⌘−)">−</button><span class="pct" title="클릭 = 100%">100%</span><button data-s="1" title="확대 (⌘+)">+</button>
+    ${fit ? `<span class="sep"></span><button data-z="fitW" title="가로에 맞춤 (⌘0)">↔ 가로 맞춤</button><button data-z="fitH" title="한 쪽이 창 높이에 맞게">↕ 세로 맞춤</button>` : ""}</div>`;
+}
+function bindZoom() {
+  const bar = document.querySelector(".zbar"), v = $("viewer");
+  bar.querySelectorAll("[data-s]").forEach(b => b.onclick = () => zoomStep(+b.dataset.s));
+  bar.querySelectorAll("[data-z]").forEach(b => b.onclick = () => zoomTo(b.dataset.z));
+  bar.querySelector(".pct").onclick = () => zoomTo("custom", 1);
+  let raf = 0;
+  const ro = new ResizeObserver(() => {
+    if (Z.mode === "custom") return;
+    cancelAnimationFrame(raf); raf = requestAnimationFrame(() => zoomTo(Z.mode));
+  });
+  ro.observe(v);
+  // 트랙패드 핀치: Chromium(WebView2) = ctrl+wheel, WebKit(WKWebView) = gesture 이벤트
+  v.addEventListener("wheel", e => {
+    if (!e.ctrlKey) return;
+    e.preventDefault(); zoomTo("custom", Z.scale * Math.exp(-e.deltaY / 200));
+  }, { passive: false });
+  let g0 = 1;
+  v.addEventListener("gesturestart", e => { e.preventDefault(); g0 = Z.scale; });
+  v.addEventListener("gesturechange", e => { e.preventDefault(); zoomTo("custom", g0 * e.scale); });
+  return () => ro.disconnect();
+}
+document.addEventListener("keydown", e => {
+  if (!(e.metaKey || e.ctrlKey) || !Z.apply || !$("viewer")) return;
+  if (e.key === "=" || e.key === "+") { e.preventDefault(); zoomStep(1); }
+  else if (e.key === "-") { e.preventDefault(); zoomStep(-1); }
+  else if (e.key === "0") { e.preventDefault(); Z.base ? zoomTo("fitW") : zoomTo("custom", 1); }
+});
+function closeMat() {
+  if (Z.stop) Z.stop();
+  Z.apply = Z.base = Z.stop = null;
+}
+
+// PDF: 쪽마다 빈 상자를 배율 크기로 깔고, 화면 근처에 온 쪽만 canvas 로 그린다(멀어지면 메모리 반납)
+async function renderPdf(v, src) {
+  const lib = await loadPdfLib();
+  const doc = await lib.getDocument({ url: src, cMapUrl: PDFJS + "cmaps/", cMapPacked: true,
+                                      standardFontDataUrl: PDFJS + "standard_fonts/" }).promise;
+  const pages = await Promise.all(Array.from({ length: doc.numPages }, (_, i) => doc.getPage(i + 1)));
+  const vps = pages.map(p => p.getViewport({ scale: 1 }));
+  v.classList.add("paged");
+  v.innerHTML = `<div class="pages">${vps.map((_, i) => `<div class="pg" data-i="${i}"><canvas></canvas></div>`).join("")}</div>`;
+  const els = [...v.querySelectorAll(".pg")], near = new Set();
+  const draw = el => {
+    const i = +el.dataset.i, c = el.firstChild, want = Z.scale * (window.devicePixelRatio || 1);
+    if (el._drawn === want) return;
+    if (el._task) el._task.cancel();
+    const vp = pages[i].getViewport({ scale: want }), off = document.createElement("canvas");
+    off.width = Math.ceil(vp.width); off.height = Math.ceil(vp.height);
+    el._task = pages[i].render({ canvasContext: off.getContext("2d"), viewport: vp });
+    el._task.promise.then(() => {   // 다 그린 뒤 바꿔 끼워 깜빡임 없이
+      el._task = null; el._drawn = want;
+      c.width = off.width; c.height = off.height; c.getContext("2d").drawImage(off, 0, 0);
+    }, () => {});
+  };
+  const io = new IntersectionObserver(es => es.forEach(e => {
+    if (e.isIntersecting) { near.add(e.target); draw(e.target); }
+    else { near.delete(e.target); if (e.target._task) e.target._task.cancel();
+           e.target._drawn = 0; e.target.firstChild.width = 0; }
+  }), { root: v, rootMargin: "600px 0px" });
+  els.forEach(el => io.observe(el));
+  let t = 0;
+  Z.base = { w: Math.max(...vps.map(p => p.width)), h: vps[0].height };
+  Z.apply = s => {
+    els.forEach((el, i) => { el.style.width = vps[i].width * s + "px"; el.style.height = vps[i].height * s + "px"; });
+    clearTimeout(t); t = setTimeout(() => near.forEach(draw), 120);   // 크기는 즉시, 다시 그리기는 멈춘 뒤
+  };
+  return () => { io.disconnect(); doc.destroy(); };
+}
+
+async function showMat(path) {
+  closeMat();
+  openDoc = path;
+  document.body.classList.add("wide");
+  const name = path.split("/").pop(), ext = name.split(".").pop().toLowerCase();
+  const src = "/file?path=" + encodeURIComponent(path);
+  const paged = ext === "pdf" || ext === "pptx";
+  $("view-mat").innerHTML = `<div class="reader matview" style="max-width:none">
+    <div class="reader-top"><button class="back">← 목록</button><b style="font-weight:600" title="${esc(name)}">${esc(name)}</b>${ext === "key" ? "" : zoomBar(paged)}</div>
+    <div class="viewer" id="viewer"><div class="pending">불러오는 중…</div></div></div>`;
+  setViewChrome();
+  $("view-mat").querySelector(".back").onclick = () => { closeMat(); openDoc = null; document.body.classList.remove("wide"); setView("mat"); };
+  const v = $("viewer");
+  try {
+    let stop = null;
+    if (ext === "pdf") {
+      stop = await renderPdf(v, src);
+    } else if (ext === "pptx") {
+      const [lib, buf] = await Promise.all([loadPptxLib(), fetch(src).then(r => r.arrayBuffer())]);
+      v.classList.add("paged");
+      v.innerHTML = `<div class="pptx"><div id="pp"></div></div>`;
+      // 배율 1 = 폭 960 으로 한 번만 그리고, 확대·축소는 CSS zoom 으로 (다시 그리지 않음)
+      await lib.init($("pp"), { width: 960, height: 540, mode: "list" }).preview(buf);
+      const sw = v.querySelector(".pptx-preview-slide-wrapper");
+      Z.base = { w: sw ? sw.offsetWidth : 960, h: sw ? sw.offsetHeight : 540 };
+      Z.apply = s => { $("pp").style.zoom = s; };
+    } else if (ext === "hwp" || ext === "hwpx") {
+      const r = await (await fetch("/api/hwp?path=" + encodeURIComponent(path))).json();
+      if (r.error) throw new Error(r.error);
+      v.innerHTML = `<p class="warn">HWP 원본의 글을 그대로 옮겨 보여준다 — 표 칸·그림·글꼴 서식은 빠진다.</p><pre class="txt">${esc(r.text)}</pre>`;
+    } else if (ext === "key") {
+      v.innerHTML = `<div class="note">Keynote(.key) 원본은 앱에서 열 수 없음 — 같은 자료의 pptx/pdf 를 materials/ 에 넣으면 보인다.</div>`;
+    } else {
+      v.innerHTML = `<pre class="code">${esc(await (await fetch(src)).text())}</pre>`;
+    }
+    if (openDoc !== path) return stop && stop();   // 그리는 사이 다른 자료로 넘어감
+    if (ext === "key") return;
+    if (!paged) Z.apply = s => { v.querySelectorAll("pre").forEach(p => p.style.zoom = s); };   // 글·코드는 글자 크기만
+    const unbind = bindZoom();
+    Z.stop = () => { unbind(); stop && stop(); };
+    paged ? zoomTo(Z.mode === "custom" ? "fitW" : Z.mode) : zoomTo("custom", 1);
+    v.scrollTop = 0;   // 첫 배율 적용은 '보던 위치' 가 없다 — 맨 위부터
+  } catch (e) {
+    v.innerHTML = `<div class="note">열기 실패: ${esc(String(e.message || e))}</div>`;
+  }
+}
+
+async function loadStudy() {
+  const list = await (await fetch("/api/study")).json();
+  $("view-study").innerHTML = list.filter(c => c.docs.length || EXPECT[c.slug]).map(c => {
+    const have = c.docs.map(d => `
+      <div class="doc" data-p="${esc(d.path)}"><span class="ico"></span>
+        <div><div class="dt">${esc(d.title)}</div><div class="dm">${d.updated} 갱신</div></div>
+        ${d.q ? `<span class="qn">${d.q}문항</span>` : ""}</div>`).join("");
+    const missing = (EXPECT[c.slug] || []).filter(([, k]) => !c.docs.some(d => d.title.includes(k))).map(([x]) => x);
+    return `<div class="course"><h2 style="color:hsl(${c.hue} 55% 38%)">${esc(c.name)}</h2>${have}
+      ${missing.map(x => `<div class="pending">… ${x} 준비 중</div>`).join("")}</div>`;
+  }).join("");
+  $("view-study").querySelectorAll(".doc").forEach(el => el.onclick = () => { toTop(); showDoc(el.dataset.p); });
+}
+
+// 문서 → [마크다운 조각 | 문항]. 문항 = `## Q.. ` ~ 다음 Q, `**정답**` 줄 뒤가 정답·해설
+const CIRC = "①②③④⑤⑥⑦⑧";
+function parseDoc(md) {
+  md = md.replace(/^---\n[\s\S]*?\n---\n/, "");
+  return md.split(/^(?=## Q\d+)/m).map((part, i) => {
+    const m = part.match(/^## (Q\d+)([^\n]*)\n([\s\S]*)$/);
+    if (!m) return { md: part };
+    const sep = m[3].match(/^\*\*(정답|힌트)\*\*[ \t]*$/m);   // `**힌트**` 블록도 정답처럼 접는다
+    const [qText, ...rest] = m[3].split(/^\*\*(?:정답|힌트)\*\*[ \t]*$/m);
+    const ans = rest.join("**정답**"), hint = !!sep && sep[1] === "힌트";
+    const first = (ans.trim().split("\n")[0] || "").replace(/\*\*/g, "").trim();
+    const choices = [...qText.matchAll(/^- ([①-⑧])\s*(.+)$/gm)].map(c => ({ n: c[1], text: c[2] }));
+    const keyM = first.match(/^((?:[①-⑧][\s·,/및]*)+)/);
+    const key = keyM ? [...keyM[1]].filter(ch => CIRC.includes(ch)) : [];
+    const ox = first.match(/^(O|X|○|×|⭕|❌)(?![A-Za-z])/);
+    let kind = "self";
+    if (choices.length >= 2 && key.length && key.every(k => choices.some(c => c.n === k))) kind = "mc";
+    else if (ox && /O\/X|OX/i.test(m[2] + qText.slice(0, 80)) ) kind = "ox";
+    return { id: m[1], head: m[1] + m[2], qText, ans, hint, choices, key, kind,
+             oxKey: ox ? (/[O○⭕]/.test(ox[1]) ? "O" : "X") : null };
+  });
+}
+
+function renderDocMd(md) {   // 읽기 모드
+  return parseDoc(md).map(x => x.md !== undefined ? mdHtml(x.md) :
+    `<section class="q"><h3 class="qh">${esc(x.head)}</h3>${mdHtml(x.qText)}` +
+    (x.ans ? `<details><summary>${x.hint ? "힌트 보기" : "정답 보기"}</summary>${mdHtml(x.ans)}</details>` : "") + `</section>`).join("");
+}
+
+// ── 풀기 모드: 객관식·O/X 자동 채점, 나머지는 내 답 쓰고 자기 채점. 진행은 문서별 localStorage ──
+const inl = t => (window.marked ? marked.parseInline(tilde(t).replace(/==([^=\n]+)==/g, "<mark>$1</mark>")) : esc(t));
+const qsKey = p => "dash-quiz:" + p;
+function loadQs(p) { try { return JSON.parse(localStorage.getItem(qsKey(p))) || {}; } catch (e) { return {}; } }
+function saveQs(p, st) { try { localStorage.setItem(qsKey(p), JSON.stringify(st)); } catch (e) {} }
+let quizOnlyWrong = false;
+const ansShow = {};   // 문항별 정답 보기/가리기 (전체 설정보다 우선, 세션 동안만)
+let quizHideAns = (() => { try { return localStorage.getItem("dash-quiz-hide") === "1"; } catch (e) { return false; } })();
+
+function renderQuiz(md, path) {
+  const st = loadQs(path), qs = parseDoc(md).filter(x => x.id);
+  const done = qs.filter(q => st[q.id]), ok = done.filter(q => st[q.id].ok).length;
+  const head = `<div class="score"><b>${ok}</b> / ${done.length} 맞음 <span>· 전체 ${qs.length}문항</span>
+      <button class="mini" data-act="wrong">${quizOnlyWrong ? "전체 보기" : "틀린 것만"}</button>
+      <button class="mini" data-act="hide">${quizHideAns ? "정답 보이기" : "정답 가리기"}</button>
+      <button class="mini" data-act="reset">다시 풀기</button></div>`;
+  const cards = qs.filter(q => !quizOnlyWrong || (st[q.id] && !st[q.id].ok)).map(q => {
+    const r = st[q.id];
+    const body = q.kind === "mc" ? mdHtml(q.qText.replace(/^- [①-⑧].*$/gm, "")) : mdHtml(q.qText);
+    let ui = "";
+    if (q.kind === "mc") {
+      const multi = q.key.length > 1, picked = r ? r.pick : [];
+      ui = `<div class="opts" data-q="${q.id}" data-multi="${multi ? 1 : ""}">` + q.choices.map(c => {
+        const cls = !r ? "" : q.key.includes(c.n) ? "right" : picked.includes(c.n) ? "wrong" : "dim";
+        return `<button class="opt ${cls}" data-n="${c.n}" ${r ? "disabled" : ""}><b>${c.n}</b><span>${inl(c.text)}</span></button>`;
+      }).join("") + `</div>` + (multi && !r ? `<div class="hint">정답 ${q.key.length}개 — 고르고 <button class="mini" data-act="check" data-q="${q.id}">확인</button></div>` : "");
+    } else if (q.kind === "ox") {
+      ui = `<div class="opts ox" data-q="${q.id}">` + ["O", "X"].map(o => {
+        const cls = !r ? "" : o === q.oxKey ? "right" : r.pick[0] === o ? "wrong" : "dim";
+        return `<button class="opt ${cls}" data-n="${o}" ${r ? "disabled" : ""}><b>${o}</b></button>`;
+      }).join("") + `</div>`;
+    } else {
+      ui = r ? (r.text ? `<div class="mine">내 답: ${esc(r.text)}</div>` : "")
+             : `<textarea class="myans" data-q="${q.id}" placeholder="내 답 (생략 가능)"></textarea>
+                <button class="mini" data-act="reveal" data-q="${q.id}">정답 보기</button>`;
+    }
+    const verdict = r && r.ok !== null ? `<span class="verdict ${r.ok ? "ok" : "no"}">${r.ok ? "맞음 ✓" : "틀림 ✗"}</span>` : "";
+    const selfGrade = q.kind === "self" && r && r.ok === null
+      ? `<div class="hint">채점: <button class="mini" data-act="self-ok" data-q="${q.id}">맞음</button> <button class="mini" data-act="self-no" data-q="${q.id}">틀림</button></div>` : "";
+    // 채점 끝난 문항: 정답 보기/가리기 · 다시 입력 (자기 채점 대기 중엔 정답 펼침)
+    const k = path + "#" + q.id;
+    const show = !!r && (k in ansShow ? ansShow[k] : r.ok === null || !quizHideAns);
+    const tools = r ? `<div class="hint">${q.ans ? `<button class="mini" data-act="toggle" data-q="${q.id}">${show ? "정답 가리기" : "정답 보기"}</button> ` : ""}<button class="mini" data-act="redo" data-q="${q.id}">다시 입력</button></div>` : "";
+    const ansOpen = (r && q.ans && show ? `<div class="answer">${mdHtml(q.ans)}</div>` : "") + tools;
+    return `<section class="q quiz ${r ? (r.ok ? "is-ok" : r.ok === false ? "is-no" : "") : ""}">
+      <h3 class="qh">${esc(q.head)} ${verdict}</h3>${body}${ui}${selfGrade}${ansOpen}</section>`;
+  }).join("") || `<div class="pending">틀린 문항 없음 ✓</div>`;
+  return head + cards;
+}
+
+function bindQuiz(root, md, path) {
+  const st = loadQs(path), qs = Object.fromEntries(parseDoc(md).filter(x => x.id).map(q => [q.id, q]));
+  const rerender = () => { root.innerHTML = renderQuiz(md, path); bindQuiz(root, md, path); };
+  const grade = (id, pick) => {
+    const q = qs[id];
+    const ok = q.kind === "ox" ? pick[0] === q.oxKey : pick.length === q.key.length && pick.every(p => q.key.includes(p));
+    st[id] = { pick, ok }; saveQs(path, st); rerender();
+  };
+  root.querySelectorAll(".opts").forEach(box => box.querySelectorAll(".opt:not([disabled])").forEach(b => b.onclick = () => {
+    if (box.dataset.multi) b.classList.toggle("sel"); else grade(box.dataset.q, [b.dataset.n]);
+  }));
+  root.querySelectorAll("[data-act]").forEach(b => b.onclick = () => {
+    const id = b.dataset.q;
+    if (b.dataset.act === "check") grade(id, [...root.querySelectorAll(`.opts[data-q="${id}"] .opt.sel`)].map(x => x.dataset.n));
+    if (b.dataset.act === "reveal") { st[id] = { text: (root.querySelector(`.myans[data-q="${id}"]`) || {}).value || "", ok: null }; saveQs(path, st); rerender(); }
+    if (b.dataset.act === "self-ok" || b.dataset.act === "self-no") { st[id].ok = b.dataset.act === "self-ok"; saveQs(path, st); rerender(); }
+    if (b.dataset.act === "toggle") { const k = path + "#" + id; ansShow[k] = !(k in ansShow ? ansShow[k] : st[id].ok === null || !quizHideAns); rerender(); }
+    if (b.dataset.act === "redo") { delete st[id]; delete ansShow[path + "#" + id]; saveQs(path, st); rerender(); }
+    if (b.dataset.act === "hide") { quizHideAns = !quizHideAns; for (const k in ansShow) delete ansShow[k]; try { localStorage.setItem("dash-quiz-hide", quizHideAns ? "1" : "0"); } catch (e) {} rerender(); }
+    if (b.dataset.act === "wrong") { quizOnlyWrong = !quizOnlyWrong; rerender(); }
+    if (b.dataset.act === "reset") { for (const k in st) delete st[k]; saveQs(path, st); quizOnlyWrong = false; rerender(); }
+  });
+}
+
+let readerMode = "read";
+async function showDoc(path) {
+  openDoc = path;
+  const r = await (await fetch("/api/doc?path=" + encodeURIComponent(path))).json();
+  const md = r.md || `> ${r.error}`;
+  const title = (md.match(/^title:\s*(.+)$/m) || [, path.split("/").pop().replace(".md", "")])[1];
+  const course = path.split("/")[0];
+  const hasQ = /^## Q\d+/m.test(md);
+  const mode = hasQ ? readerMode : "read";
+  $("view-study").innerHTML = `<div class="reader">
+    <div class="reader-top"><button class="back">← 목록</button>
+      ${hasQ ? `<span class="seg"><button data-m="read" class="${mode === "read" ? "on" : ""}">읽기</button><button data-m="quiz" class="${mode === "quiz" ? "on" : ""}">풀기</button></span>` : ""}
+      ${hasQ && mode === "read" ? `<button class="all">정답 전부 펼치기</button>` : ""}</div>
+    <div class="dm" style="color:var(--sub);font-size:12px">${esc(course)}</div>
+    <h1 class="title"><mark>${esc(title)}</mark></h1>
+    <div class="md" id="docbody">${mode === "quiz" ? renderQuiz(md, path) : renderDocMd(md)}</div></div>`;
+  if (mode === "quiz") bindQuiz($("docbody"), md, path); else addCopy($("docbody"));
+  setViewChrome();
+  $("view-study").querySelector(".back").onclick = () => { openDoc = null; setView("study"); };
+  $("view-study").querySelectorAll(".seg button").forEach(b => b.onclick = () => { readerMode = b.dataset.m; quizOnlyWrong = false; showDoc(path); });
+  const all = $("view-study").querySelector(".all");
+  if (all) all.onclick = () => {
+    const ds = [...document.querySelectorAll(".q details")], open = !ds.every(d => d.open);
+    ds.forEach(d => d.open = open); all.textContent = open ? "정답 전부 접기" : "정답 전부 펼치기";
+  };
+}
+function addCopy(root) {   // 코드블록 복사 버튼 (시험용 틀 코드 → VS 에 붙여넣기)
+  root.querySelectorAll("pre").forEach(p => {
+    const b = document.createElement("button");
+    b.className = "copy"; b.textContent = "복사";
+    b.onclick = async () => {
+      const t = (p.querySelector("code") || p).innerText;
+      try { await navigator.clipboard.writeText(t); }
+      catch (e) { const ta = document.createElement("textarea"); ta.value = t; document.body.appendChild(ta); ta.select(); document.execCommand("copy"); ta.remove(); }
+      b.textContent = "복사됨 ✓"; setTimeout(() => b.textContent = "복사", 1200);
+    };
+    p.prepend(b);
+  });
+}
+function setViewChrome() {
+  $("sync").hidden = !!openDoc;
+  document.body.classList.toggle("wide", (view === "mat" && !!openDoc) || view === "concept");
+  document.querySelector(".page-list").classList.toggle("reading", !!openDoc);
+}
+
+// ── 개념 탭: <과목>/개념/*.md 를 [[링크]]로 이어 Obsidian 처럼 타고 다닌다 (역링크·연결 지도는 links 를 뒤집어 계산) ──
+let CX = null, cxTrail = [], cxTimer = null;
+const NOTE_ID = /^\d{4}-\d{2}-\d{2}_/;
+async function loadConcepts() {
+  CX = await (await fetch("/api/concepts")).json();
+  CX.by = Object.fromEntries(CX.concepts.map(c => [c.name, c]));
+  CX.alias = {};                                   // [[open]] → 별칭으로 가진 개념(파일 디스크립터)으로
+  CX.concepts.forEach(c => c.aliases.forEach(a => { if (!CX.by[a]) CX.alias[a.toLowerCase()] = c.name; }));
+  CX.concepts.forEach(c => c.links = [...new Set(c.links.map(cxResolve))].filter(n => n !== c.name));
+  if (!CX.concepts.length) { $("view-concept").innerHTML = `<div class="empty">개념 페이지가 아직 없음 — &lt;과목&gt;/개념/*.md</div>`; return; }
+  let saved = null; try { saved = localStorage.getItem("dash-concept"); } catch (e) {}
+  const start = [curConcept, saved].find(n => n && (CX.by[n] || cxBacks(n).length)) || CX.concepts[0].name;
+  $("view-concept").innerHTML = `<div class="cx">
+    <div><input class="cx-search" id="cxq" placeholder="🔍 키워드 (예: 프로세스)" autocomplete="off">
+      <div class="cx-hint">개념 이름 · 별칭 · 본문 + 강의노트 전문</div><div id="cxlist"></div></div>
+    <div id="cxdoc"></div>
+    <div class="cx-map"><b>연결 지도</b><svg id="cxg" viewBox="0 0 300 270"></svg>
+      <div class="lg">가운데 = 지금 개념 · 실선 = 이 페이지가 링크 · 점선 = 나를 링크</div>
+      <h4>이 개념을 언급한 곳</h4><div id="cxbl"></div></div></div>`;
+  $("cxq").oninput = () => { cxList(); clearTimeout(cxTimer); cxTimer = setTimeout(cxNoteSearch, 250); };
+  $("cxq").onkeydown = e => { if (e.key === "Enter") { const f = $("cxlist").querySelector("[data-c]"); if (f) cxGo(f.dataset.c); } };
+  $("view-concept").onclick = e => {
+    const t = e.target.closest("[data-c],[data-note]");
+    if (!t) return;
+    if (t.dataset.note) { conceptBack = curConcept; openDoc = t.dataset.note; toTop(); setView("notes"); }
+    else cxGo(t.dataset.c);
+  };
+  cxGo(start);
+}
+const cxResolve = n => (n = n.trim(), CX.by[n] ? n : CX.alias[n.toLowerCase()] || n);
+const cxBacks = name => (CX ? CX.concepts.filter(c => c.name !== name && c.links.includes(name)).map(c => c.name) : []);
+const cxLinks = md => md.replace(/\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g, (_, n, label) => {
+  n = n.trim(); const txt = esc(label || n); n = cxResolve(n);
+  if (NOTE_ID.test(n)) return `<a class="wl" data-note="${esc(n)}">${CX.notes[n] ? esc(noteTitle(CX.notes[n].title)) : txt}</a>`;
+  return `<a class="wl${CX.by[n] ? "" : " stub"}" data-c="${esc(n)}">${txt}</a>`;
+});
+function cxGo(name) {
+  curConcept = name;
+  try { localStorage.setItem("dash-concept", name); } catch (e) {}
+  const i = cxTrail.indexOf(name);
+  cxTrail = i >= 0 ? cxTrail.slice(0, i + 1) : [...cxTrail, name].slice(-7);
+  const c = CX.by[name], bl = cxBacks(name);
+  const src = (ids, ty) => ids.map(id => { const n = CX.notes[id]; return n ? `<div class="cx-src" data-note="${esc(id)}"><span class="ty">${ty}</span><b>${esc(noteTitle(n.title))}</b><small>${n.week}주차 · ${n.date.slice(5)}</small></div>` : ""; }).join("");
+  const trail = `<div class="cx-trail">${cxTrail.length > 1 ? "지나온 길 · " + cxTrail.map((t, k) => k === cxTrail.length - 1 ? `<b>${esc(t)}</b>` : `<a data-c="${esc(t)}">${esc(t)}</a> →`).join(" ") : "&nbsp;"}</div>`;
+  if (!c) {
+    $("cxdoc").innerHTML = trail + `<div class="cx-title"><h1>${esc(name)}</h1></div>
+      <div class="cx-stub"><h3>아직 페이지가 없는 개념</h3>
+      <p>개념 페이지 ${bl.length}곳에서 링크만 걸려 있어요. 자료 근거가 약하면 설명을 지어내지 않고 비워 둡니다.</p>
+      <p>왼쪽 검색창에 「${esc(name)}」을 넣으면 강의노트 원문에서 나온 곳을 찾아요.</p></div>`;
+  } else {
+    $("cxdoc").innerHTML = trail + `<div class="cx-title"><h1>${esc(name)}</h1>
+        <span class="cx-pill" style="background:hsl(${c.hue} 50% 42%)">${esc(c.slug)}</span>${c.aliases.length ? `<span class="al">${esc(c.aliases.join(" · "))}</span>` : ""}</div>
+      ${c.def ? `<div class="cx-def"><div class="lab">정의 · 자료 원문</div><div class="md">${mdHtml(cxLinks(c.def))}</div></div>` : ""}
+      <div class="md">${mdHtml(cxLinks(c.md))}</div>
+      ${c.sources.length || c.mentions.length ? `<div class="cx-h">나온 곳</div>${src(c.sources, "근거")}${src(c.mentions, "언급")}` : ""}`;
+  }
+  $("cxbl").innerHTML = bl.map(b => {
+    const plain = (CX.by[b].def + "\n" + CX.by[b].md).replace(/[=*`>#]/g, "");
+    const keys = [name, ...(CX.by[name] ? CX.by[name].aliases : [])].map(k => `[[${k}`);
+    const sent = plain.split(/(?<=[.다])\s+|\n+/).find(s => keys.some(k => s.includes(k))) || "";
+    return `<div class="cx-bl"><a data-c="${esc(b)}">${esc(b)}</a> — <span>${esc(sent.replace(/\[\[([^\]|]+)(?:\|([^\]]*))?\]\]/g, (_, a, l) => l || a).slice(0, 80))}</span></div>`;
+  }).join("") || `<div class="cx-bl"><span>아직 없음</span></div>`;
+  cxGraph(name);
+  cxList();
+  $("cxdoc").scrollTop = 0;
+}
+function cxGraph(name) {
+  const out = CX.by[name] ? CX.by[name].links.filter(n => !NOTE_ID.test(n)) : [];
+  const nb = [...out.map(n => [n, 0]), ...cxBacks(name).filter(b => !out.includes(b)).map(n => [n, 1])].slice(0, 14);
+  const cx = 150, cy = 135, r = 100, pos = (i) => { const a = -Math.PI / 2 + i * 2 * Math.PI / nb.length; return [cx + r * Math.cos(a), cy + r * Math.sin(a) * .95, a]; };
+  let s = "";
+  nb.forEach(([n, back], i) => { const [x, y] = pos(i);
+    s += `<line x1="${cx}" y1="${cy}" x2="${x}" y2="${y}" stroke="${back ? "#b9a75c" : "#2f6fd6"}" stroke-width="1.6" ${back ? 'stroke-dasharray="4 4"' : ""} opacity=".7"/>`; });
+  nb.forEach(([n], i) => { const [x, y, a] = pos(i), stub = !CX.by[n];
+    s += `<g data-c="${esc(n)}"><circle cx="${x}" cy="${y}" r="7" fill="#fdfbf3" stroke="${stub ? "#b07a2a" : "#2f6fd6"}" stroke-width="2" ${stub ? 'stroke-dasharray="3 2"' : ""}/>
+      <text x="${x}" y="${y + (Math.sin(a) < -0.3 ? -12 : 21)}" text-anchor="middle" fill="${stub ? "#b07a2a" : "#1d1d1f"}">${esc(n)}</text></g>`; });
+  s += `<circle cx="${cx}" cy="${cy}" r="32" fill="#fff27a" stroke="#e9d85a" stroke-width="2"/><text x="${cx}" y="${cy + 5}" text-anchor="middle" fill="#1d1d1f" style="font-size:13.5px">${esc(name.length > 7 ? name.slice(0, 6) + "…" : name)}</text>`;
+  $("cxg").innerHTML = s;
+}
+function cxList() {
+  const q = ($("cxq").value || "").trim().toLowerCase(), el = $("cxlist");
+  if (!q) {
+    const stubs = [...new Set(CX.concepts.flatMap(c => c.links))].filter(n => !CX.by[n] && !NOTE_ID.test(n));
+    el.innerHTML = Object.entries(Object.fromEntries(CX.concepts.map(c => [c.slug, c.hue]))).map(([slug, hue]) => {
+      const cs = CX.concepts.filter(c => c.slug === slug).sort((a, b) => cxBacks(b.name).length - cxBacks(a.name).length || a.name.localeCompare(b.name));
+      return cs.length ? `<div class="cx-grp" style="color:hsl(${hue} 55% 38%)">${esc(slug)} · ${cs.length}개</div>` + cs.map(c =>
+        `<div class="cx-item${c.name === curConcept ? " on" : ""}" data-c="${esc(c.name)}"><b>${esc(c.name)}</b><small>←${cxBacks(c.name).length}</small></div>`).join("") : "";
+    }).join("") + (stubs.length ? `<div class="cx-grp" style="color:#b07a2a">빈 페이지 · ${stubs.length}개</div>` +
+      stubs.map(n => `<div class="cx-item stub${n === curConcept ? " on" : ""}" data-c="${esc(n)}"><b>${esc(n)}</b><small>←${cxBacks(n).length}</small></div>`).join("") : "");
+    return;
+  }
+  const hits = CX.concepts.map(c => {
+    const text = (c.def + " " + c.md).replace(/[=*`>#]|\[\[|\]\]/g, "");
+    const inName = (c.name + " " + c.aliases.join(" ")).toLowerCase().includes(q), at = text.toLowerCase().indexOf(q);
+    if (!inName && at < 0) return null;
+    const snip = at >= 0 ? "…" + esc(text.slice(Math.max(0, at - 16), at)) + "<mark>" + esc(text.slice(at, at + q.length)) + "</mark>" + esc(text.slice(at + q.length, at + q.length + 26)) + "…" : "";
+    return [c, inName ? 0 : 1, snip];
+  }).filter(Boolean).sort((a, b) => a[1] - b[1]);
+  el.innerHTML = `<div class="cx-grp" style="color:var(--blue)">개념 ${hits.length}개</div>` +
+    (hits.map(([c, t, snip]) => `<div class="cx-item${c.name === curConcept ? " on" : ""}" data-c="${esc(c.name)}"><b>${esc(c.name)}</b><small>${t ? "본문" : esc(c.slug)}</small></div>${snip && t ? `<div class="cx-snip">${snip}</div>` : ""}`).join("") || `<div class="cx-hint">개념 페이지엔 없음</div>`) +
+    `<div id="cxnotes"></div>`;
+}
+async function cxNoteSearch() {
+  const q = ($("cxq") && $("cxq").value || "").trim();
+  if (q.length < 2 || !$("cxnotes")) return;
+  const hits = await (await fetch("/api/search?q=" + encodeURIComponent(q))).json();
+  if (!$("cxnotes") || $("cxq").value.trim() !== q) return;
+  const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"), "gi");
+  $("cxnotes").innerHTML = `<div class="cx-grp" style="color:var(--pencil)">강의노트 원문 ${hits.length}개</div>` + hits.map(h =>
+    `<div class="cx-item" data-note="${esc(h.id)}"><b>${esc(noteTitle(h.title))}</b><small>${esc(h.slug)} ×${h.count}</small></div>
+     <div class="cx-snip">…${esc(h.snip).replace(re, m => `<mark>${m}</mark>`)}…</div>`).join("");
+}
+
+$("refresh").onclick = () => load(true);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) load(false); });
+setInterval(() => load(false), 60000);
+load(false);
+if (location.hash.startsWith("#doc=")) {   // 직접 열기: #doc=<경로>[&quiz]
+  const [p, q] = location.hash.slice(5).split("&");
+  view = "study"; openDoc = decodeURIComponent(p); if (q === "quiz") readerMode = "quiz";
+}
+if (location.hash.startsWith("#note=")) { view = "notes"; openDoc = decodeURIComponent(location.hash.slice(6)); }   // 강의노트 직접 열기
+if (location.hash.startsWith("#concept=")) { view = "concept"; curConcept = decodeURIComponent(location.hash.slice(9)); }   // 개념 직접 열기
+if (location.hash.startsWith("#mat=")) { view = "mat"; openDoc = decodeURIComponent(location.hash.slice(5)); }   // 자료 직접 열기
+setView(view);
+</script>
+</body>
+</html>

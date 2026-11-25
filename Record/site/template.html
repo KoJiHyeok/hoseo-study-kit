@@ -1,0 +1,710 @@
+<title>__SEMESTER__ 강의노트</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@400;500;700;900&family=JetBrains+Mono:wght@400;600&display=swap">
+<style>
+  :root {
+    --ground: #F4F5F7;
+    --surface: #FFFFFF;
+    --ink: #1F2428;
+    --muted: #8A939B;
+    --line: #E4E7EA;
+    --tab: #3D6BFF;
+    --tab-act: #E8544A;
+    --tab-cal: #E8890C;
+    --hl-y: #FFF176;          /* 형광펜 노랑 (요지) */
+    --hl-g: #B9F6CA;          /* 형광펜 초록 (키워드) */
+    --hl-mark: #FFE082;       /* ==강조== */
+    --warn-bg: #FFF3F2;
+    --code-bg: #F0F2F4;
+    --chip-s: 70%;
+    --chip-l: 46%;
+    --shadow: 0 1px 3px rgba(31,36,40,.07);
+  }
+  /* 화이트 고정 (2026-08-31 사용자 결정) — 다크 모드에서도 항상 라이트 팔레트 */
+  * { box-sizing: border-box; }
+  body {
+    background: var(--ground);
+    color: var(--ink);
+    font-family: "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    font-size: 15px;
+    line-height: 1.8;
+    -webkit-font-smoothing: antialiased;
+  }
+  .wrap { max-width: 700px; margin: 0 auto; padding: 40px 20px 96px; }
+
+  a { color: var(--tab); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  :focus-visible { outline: 2px solid var(--tab); outline-offset: 2px; border-radius: 3px; }
+  button { font-family: inherit; }
+
+  /* ---------- home ---------- */
+  .eyebrow {
+    display: inline-block; background: var(--ink); color: var(--surface);
+    font-size: 12px; font-weight: 700; letter-spacing: .08em;
+    padding: 3px 11px; border-radius: 4px;
+  }
+  h1.site { font-size: 32px; font-weight: 900; margin: 14px 0 2px; letter-spacing: -.02em; }
+  .built { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted); }
+
+  .courses { list-style: none; margin: 30px 0 0; padding: 0; display: flex; flex-direction: column; gap: 10px; }
+  .course-row {
+    display: flex; align-items: center; gap: 14px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 15px 18px; cursor: pointer; box-shadow: var(--shadow);
+    transition: border-color .12s, transform .12s;
+    width: 100%; text-align: left; font: inherit; color: inherit;
+  }
+  .course-row:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .course-row[disabled] { cursor: default; opacity: .5; }
+  .course-row[disabled]:hover { border-color: var(--line); transform: none; }
+  .dot { width: 11px; height: 11px; border-radius: 3px; flex: none; }
+  .course-name { font-weight: 900; font-size: 15.5px; letter-spacing: -.01em; }
+  .course-meta { font-size: 12.5px; color: var(--muted); }
+  .grow { flex: 1; min-width: 0; }
+  .count { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted); white-space: nowrap; }
+  .count b { color: var(--tab); font-weight: 600; }
+
+  /* ---------- course page ---------- */
+  .back {
+    display: inline-block; margin-bottom: 22px; font-size: 13px; font-weight: 700;
+    color: var(--muted); background: none; border: 0; cursor: pointer; padding: 0;
+  }
+  .back:hover { color: var(--tab); }
+  h1.course { font-size: 26px; font-weight: 900; margin: 0 0 2px; letter-spacing: -.02em; }
+  .course-sub { font-size: 13px; color: var(--muted); margin-bottom: 26px; }
+  .week-label {
+    display: inline-block; background: var(--ink); color: var(--surface);
+    font-size: 11.5px; font-weight: 700; letter-spacing: .08em;
+    padding: 2px 10px; border-radius: 4px; margin: 24px 0 10px;
+  }
+  .notes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 9px; }
+  .note-row {
+    display: block; width: 100%; text-align: left; font: inherit; color: inherit;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 14px 17px; cursor: pointer; box-shadow: var(--shadow);
+    transition: border-color .12s, transform .12s;
+  }
+  .note-row:hover { border-color: var(--ink); transform: translateY(-1px); }
+  .note-row .t { font-weight: 900; font-size: 15px; letter-spacing: -.01em; }
+  .note-row .d { font-family: "JetBrains Mono", monospace; font-size: 11.5px; color: var(--muted); margin-top: 3px; }
+  .note-row .one { font-size: 13px; color: var(--muted); margin-top: 7px; line-height: 1.6; }
+  .empty { color: var(--muted); font-size: 14px; margin-top: 24px; }
+
+  /* ---------- note reader ---------- */
+  .chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    font-size: 12.5px; font-weight: 700; color: var(--muted); margin: 14px 0 8px;
+  }
+  h1.note-title { font-size: 24px; font-weight: 900; line-height: 1.45; margin: 0; letter-spacing: -.02em; }
+  .note-date { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted); margin-top: 6px; }
+  .tldr {
+    margin: 20px 0 4px; font-size: 16.5px; font-weight: 700; line-height: 2.05;
+  }
+  .tldr span {
+    background: linear-gradient(transparent 8%, var(--hl-y) 8%, var(--hl-y) 88%, transparent 88%);
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  }
+
+  .note-body { margin-top: 6px; }
+  .note-body h1 { display: none; }
+  .note-body h2 {
+    display: inline-block; font-size: 13px; font-weight: 900; letter-spacing: .08em;
+    color: #fff; background: var(--tab); padding: 3px 11px; border-radius: 4px;
+    margin: 30px 0 10px;
+  }
+  .note-body h2.tab-act { background: var(--tab-act); }
+  .note-body h2.tab-cal { background: var(--tab-cal); }
+  .note-body h3 { font-size: 15px; font-weight: 700; margin: 20px 0 6px; }
+  .note-body p { margin: 10px 0; }
+  .note-body strong {
+    font-weight: 700;
+    background: linear-gradient(transparent 55%, var(--hl-g) 55%);
+    box-decoration-break: clone; -webkit-box-decoration-break: clone;
+  }
+  .note-body mark { background: var(--hl-mark); color: inherit; padding: 0 2px; border-radius: 2px; }
+  .note-body ul, .note-body ol { margin: 8px 0; padding-left: 4px; list-style: none; }
+  .note-body ol { padding-left: 22px; list-style: decimal; }
+  .note-body ul > li { margin: 9px 0; padding-left: 17px; position: relative; }
+  .note-body ul > li::before {
+    content: ""; position: absolute; left: 0; top: 11.5px;
+    width: 7px; height: 7px; background: var(--tab); border-radius: 1.5px;
+  }
+  .note-body ul > li > ul { margin: 4px 0 4px -4px; }
+  .note-body ul > li > ul > li::before { width: 5px; height: 5px; top: 12.5px; background: var(--muted); border-radius: 50%; }
+  .note-body li:has(> input[type="checkbox"])::before { display: none; }
+  .note-body li > input[type="checkbox"] { accent-color: var(--tab-act); margin-right: 6px; }
+  .note-body blockquote {
+    margin: 14px 0; padding: 11px 15px;
+    background: var(--warn-bg); border-left: 4px solid var(--tab-act);
+    border-radius: 0 8px 8px 0; font-size: 14px;
+  }
+  .note-body blockquote p { margin: 0; }
+  .note-body code {
+    font-family: "JetBrains Mono", monospace; font-size: .85em;
+    background: var(--code-bg); padding: 1px 6px; border-radius: 4px;
+  }
+  .note-body pre {
+    background: var(--code-bg); border: 1px solid var(--line);
+    border-radius: 8px; padding: 12px 14px; overflow-x: auto; line-height: 1.6;
+  }
+  .note-body pre code { background: none; padding: 0; }
+  .note-body .tbl { overflow-x: auto; margin: 14px 0; }
+  .note-body table { border-collapse: collapse; font-size: 13.5px; min-width: 320px; }
+  .note-body th, .note-body td { border: 1px solid var(--line); padding: 6px 11px; text-align: left; }
+  .note-body th { background: var(--code-bg); font-weight: 700; }
+  .note-body hr { border: 0; border-top: 1px solid var(--line); margin: 26px 0; }
+
+  /* 보조 섹션 접기 */
+  details.aux { margin: 14px 0; border: 1px solid var(--line); border-radius: 10px; background: var(--surface); }
+  details.aux > summary {
+    cursor: pointer; list-style: none; padding: 10px 15px;
+    font-size: 13px; font-weight: 700; color: var(--muted); user-select: none;
+  }
+  details.aux > summary::before { content: "▸ "; color: var(--muted); }
+  details.aux[open] > summary::before { content: "▾ "; }
+  details.aux > summary::-webkit-details-marker { display: none; }
+  details.aux > .aux-body { padding: 0 15px 12px; font-size: 14px; }
+  details.aux h2 { margin-top: 4px !important; }
+
+  /* ---------- 모드 전환 (강의노트 | 시험지) ---------- */
+  .modes { display: inline-flex; gap: 4px; background: var(--code-bg); border-radius: 9px; padding: 4px; margin: 22px 0 4px; }
+  .modes .mode {
+    border: 0; background: none; cursor: pointer; font: inherit; font-size: 13.5px; font-weight: 700;
+    color: var(--muted); padding: 6px 15px; border-radius: 6px;
+  }
+  .modes .mode.on { background: var(--surface); color: var(--ink); box-shadow: var(--shadow); }
+
+  /* ---------- 시험지 ---------- */
+  .exam-sub { font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .q {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin: 12px 0; box-shadow: var(--shadow);
+  }
+  .q-head { display: flex; align-items: baseline; gap: 9px; margin-bottom: 8px; }
+  .q-no { font-weight: 900; font-size: 15.5px; letter-spacing: -.01em; }
+  .q-meta {
+    font-size: 11.5px; font-weight: 700; color: var(--muted);
+    background: var(--code-bg); padding: 2px 8px; border-radius: 20px;
+  }
+  .q-body > :first-child { margin-top: 0; }
+  .q-body > :last-child { margin-bottom: 0; }
+  .q-body p { margin: 8px 0; }
+  .q-body ul, .q-body ol { margin: 8px 0; padding-left: 20px; }
+  .q-body li { margin: 5px 0; }
+  .q-body mark { background: var(--hl-mark); color: inherit; padding: 0 2px; border-radius: 2px; }
+  .q-body code { font-family: "JetBrains Mono", monospace; font-size: .85em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+  .q-body pre { background: var(--code-bg); border: 1px solid var(--line); border-radius: 8px; padding: 12px 14px; overflow-x: auto; line-height: 1.6; }
+  .q-body pre code { background: none; padding: 0; }
+  .q-body table { border-collapse: collapse; font-size: 13.5px; }
+  .q-body th, .q-body td { border: 1px solid var(--line); padding: 5px 10px; }
+
+  details.ans { margin-top: 12px; border-top: 1px dashed var(--line); padding-top: 10px; }
+  details.ans > summary {
+    cursor: pointer; list-style: none; font-size: 12.5px; font-weight: 700;
+    color: var(--tab); user-select: none; display: inline-block;
+  }
+  details.ans > summary::-webkit-details-marker { display: none; }
+  details.ans > summary::before { content: "▸ "; }
+  details.ans[open] > summary::before { content: "▾ "; }
+  details.ans[open] > summary { color: var(--muted); }
+  .ans-body {
+    margin-top: 9px; padding: 12px 14px; background: #F7FBF8;
+    border-left: 4px solid #34A853; border-radius: 0 8px 8px 0; font-size: 14px;
+  }
+  .ans-body > :first-child { margin-top: 0; }
+  .ans-body > :last-child { margin-bottom: 0; }
+  .q-src { margin-top: 9px; font-size: 12px; color: var(--muted); }
+  .exam-actions { margin: 6px 0 18px; }
+  .multi-hint { font-size: 12px; color: var(--muted); margin: -4px 0 8px; }
+  .jump { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 14px; }
+  .jump a { font-size: 12px; padding: 3px 9px; border: 1px solid var(--line, #ddd); border-radius: 999px; cursor: pointer; color: var(--muted); }
+  .jump a:hover { color: var(--ink); border-color: var(--ink); }
+  .exam-actions button {
+    border: 1px solid var(--line); background: var(--surface); color: var(--muted);
+    font-size: 12.5px; font-weight: 700; padding: 6px 13px; border-radius: 7px; cursor: pointer;
+  }
+  .exam-actions button:hover { border-color: var(--ink); color: var(--ink); }
+
+  /* ---------- 객관식 풀이 ---------- */
+  .quiz-bar {
+    position: sticky; top: 0; z-index: 5; margin: 6px -20px 18px; padding: 10px 20px;
+    background: rgba(244,245,247,.94); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    border-bottom: 1px solid var(--line);
+    display: flex; flex-wrap: wrap; align-items: center; gap: 8px;
+  }
+  .quiz-bar .prog { font-family: "JetBrains Mono", monospace; font-size: 12.5px; color: var(--muted); margin-right: auto; }
+  .quiz-bar .prog b { color: var(--ink); }
+  .quiz-bar button {
+    border: 1px solid var(--line); background: var(--surface); color: var(--ink);
+    font-size: 12.5px; font-weight: 700; padding: 6px 13px; border-radius: 7px; cursor: pointer;
+  }
+  .quiz-bar button:hover { border-color: var(--ink); }
+  .quiz-bar button.primary { background: var(--ink); color: var(--surface); border-color: var(--ink); }
+  .quiz-bar button.on { background: var(--tab-act); color: #fff; border-color: var(--tab-act); }
+  .score {
+    background: var(--surface); border: 1px solid var(--line); border-radius: 12px;
+    padding: 16px 18px; margin: 0 0 16px; box-shadow: var(--shadow);
+  }
+  .score .big { font-size: 30px; font-weight: 900; letter-spacing: -.02em; }
+  .score .big span {
+    background: linear-gradient(transparent 55%, var(--hl-y) 55%, var(--hl-y) 92%, transparent 92%);
+  }
+  .score .pct { font-family: "JetBrains Mono", monospace; font-size: 13px; color: var(--muted); margin-left: 8px; }
+  .score .wrong { margin-top: 8px; font-size: 13px; color: var(--muted); }
+  .score .wrong a { font-weight: 700; color: var(--tab-act); margin-right: 8px; cursor: pointer; }
+  .choices { list-style: none; padding: 0; margin: 10px 0 0; display: flex; flex-direction: column; gap: 6px; }
+  .ch {
+    display: flex; gap: 10px; width: 100%; text-align: left; font: inherit; font-size: 14.5px; line-height: 1.6;
+    color: var(--ink); background: var(--surface); border: 1.5px solid var(--line); border-radius: 9px;
+    padding: 8px 12px; cursor: pointer; transition: border-color .1s, background .1s;
+  }
+  .ch:hover { border-color: #B8C0C7; }
+  .ch .k { font-weight: 900; flex: none; color: var(--muted); }
+  .ch.sel { border-color: var(--tab); background: #EEF2FF; }
+  .ch.sel .k { color: var(--tab); }
+  .ch:disabled { cursor: default; }
+  .ch mark { background: var(--hl-mark); color: inherit; }
+  .ch code { font-family: "JetBrains Mono", monospace; font-size: .88em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .q.reveal .ch.key, .q.graded .ch.key { border-color: #34A853; background: #F1FAF3; }
+  .q.reveal .ch.key .k, .q.graded .ch.key .k { color: #34A853; }
+  .q.graded .ch.sel:not(.key) { border-color: var(--tab-act); background: var(--warn-bg); }
+  .q.graded .ch.sel:not(.key) .k { color: var(--tab-act); }
+  .q.ok { border-left: 4px solid #34A853; }
+  .q.ng { border-left: 4px solid var(--tab-act); }
+  .verdict { font-size: 11.5px; font-weight: 900; padding: 2px 8px; border-radius: 20px; margin-left: auto; }
+  .q.ok .verdict { background: #E3F5E8; color: #1E7B3A; }
+  .q.ng .verdict { background: var(--warn-bg); color: var(--tab-act); }
+  .only-wrong .q.ok, .only-wrong .q.nochoice { display: none; }
+
+  /* ---------- 할 일 ---------- */
+  .todo-sub { font-size: 13px; color: var(--muted); margin-bottom: 6px; }
+  .todo-sub b { color: var(--tab-act); font-weight: 700; }
+  .todo-week { margin-top: 30px; }
+  .todo-week-head { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .todo-week-head h2 { font-size: 18px; font-weight: 900; margin: 0; letter-spacing: -.01em; }
+  .todo-week-head .range { font-family: "JetBrains Mono", monospace; font-size: 12px; color: var(--muted); }
+  .todo-week-head .now {
+    font-size: 11px; font-weight: 700; color: #fff; background: var(--tab-act);
+    padding: 1px 8px; border-radius: 20px; letter-spacing: .04em;
+  }
+  .todo-week.past { opacity: .72; }
+  .todo-course { margin-top: 14px; }
+  .todo-list { list-style: none; margin: 6px 0 0; padding: 0; }
+  .todo-item {
+    display: grid; grid-template-columns: 22px 1fr; column-gap: 10px;
+    background: var(--surface); border: 1px solid var(--line); border-radius: 10px;
+    padding: 10px 14px; margin: 6px 0; box-shadow: var(--shadow);
+  }
+  .todo-item input[type="checkbox"] { width: 17px; height: 17px; margin: 5px 0 0; accent-color: var(--tab-act); cursor: pointer; }
+  .todo-item input[disabled] { cursor: default; }
+  .todo-text { font-size: 14.5px; line-height: 1.65; }
+  .todo-text p { margin: 0; display: inline; }
+  .todo-text code { font-family: "JetBrains Mono", monospace; font-size: .85em; background: var(--code-bg); padding: 1px 6px; border-radius: 4px; }
+  .todo-text mark { background: var(--hl-mark); color: inherit; padding: 0 2px; border-radius: 2px; }
+  .todo-item.done .todo-text { color: var(--muted); text-decoration: line-through; }
+  .todo-item.done .due { display: none; }
+  .due {
+    display: inline-block; margin-left: 8px; font-family: "JetBrains Mono", monospace;
+    font-size: 11.5px; font-weight: 600; padding: 1px 8px; border-radius: 20px;
+    background: var(--code-bg); color: var(--muted); vertical-align: 1px; white-space: nowrap;
+  }
+  .due.soon { background: #FFF1E0; color: #B85C00; }
+  .due.over { background: var(--warn-bg); color: var(--tab-act); }
+  .todo-notes { margin: 4px 0 0; padding-left: 16px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+  .todo-notes li { margin: 2px 0; }
+  .todo-notes p { margin: 0; display: inline; }
+  .todo-notes code { font-family: "JetBrains Mono", monospace; font-size: .85em; background: var(--code-bg); padding: 1px 5px; border-radius: 4px; }
+  .todo-item.done .todo-notes { display: none; }
+  .todo-legend { font-size: 12px; color: var(--muted); margin: 4px 0 0; }
+
+  @media (prefers-reduced-motion: reduce) {
+    .course-row, .note-row { transition: none; transform: none !important; }
+  }
+</style>
+
+<div class="wrap" id="app"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script>
+/*__DATA__*/
+
+const app = document.getElementById("app");
+const D = window.DATA;
+const esc = s => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const chipColor = hue => `hsl(${hue} var(--chip-s) var(--chip-l))`;
+
+marked.setOptions({ gfm: true, breaks: false });
+
+const AUX_SECTIONS = ["기술", "위키", "기타"];      // 접힘 처리할 h2 키워드
+const TAB_ACT = ["액션"], TAB_CAL = ["일정", "마감"];
+
+function notesOf(slug) { return D.notes.filter(n => n.slug === slug); }
+
+function render() {
+  const h = location.hash;
+  let m;
+  if ((m = h.match(/^#\/note\/(.+)$/))) return renderNote(decodeURIComponent(m[1]));
+  if ((m = h.match(/^#\/course\/(.+)$/))) return renderCourse(decodeURIComponent(m[1]));
+  if ((m = h.match(/^#\/exam\/(.+)$/))) return renderExam(decodeURIComponent(m[1]));
+  if (h === "#/exams") return renderExams();
+  if (h === "#/todo") return renderTodo();
+  renderHome();
+}
+
+function renderHome() {
+  const rows = D.order.map(slug => {
+    const c = D.courses[slug];
+    const ns = notesOf(slug);
+    const latest = ns.length ? ns[ns.length - 1].date : null;
+    return `<li><button class="course-row" ${ns.length ? "" : "disabled"}
+      ${ns.length ? `onclick="location.hash='#/course/${esc(slug)}'"` : ""}>
+      <span class="dot" style="background:${chipColor(c.hue)}"></span>
+      <span class="grow">
+        <span class="course-name">${esc(c.name)}</span>
+        <div class="course-meta">${esc(c.prof)} · ${esc(c.when)}</div>
+      </span>
+      <span class="count">${ns.length ? `<b>${ns.length}</b>개${latest ? " · ~" + latest.slice(5) : ""}` : "아직 없음"}</span>
+    </button></li>`;
+  }).join("");
+  app.innerHTML = `
+    <span class="eyebrow">__LABEL__</span>
+    <h1 class="site">강의노트</h1>
+    <div class="built">마지막 갱신 ${D.built} · 요약 ${D.notes.length}개</div>
+    ${modeBar("notes")}
+    <ul class="courses">${rows}</ul>`;
+  window.scrollTo(0, 0);
+}
+
+function renderCourse(slug) {
+  const c = D.courses[slug];
+  if (!c) return renderHome();
+  const ns = notesOf(slug);
+  const byWeek = new Map();
+  for (const n of ns) {
+    if (!byWeek.has(n.week)) byWeek.set(n.week, []);
+    byWeek.get(n.week).push(n);
+  }
+  const groups = [...byWeek.entries()].sort((a, b) => a[0] - b[0]).map(([w, list]) => `
+    <div><span class="week-label">${w}주차</span></div>
+    <ul class="notes">${list.map(n => `
+      <li><button class="note-row" onclick="location.hash='#/note/${encodeURIComponent(n.id)}'">
+        <div class="t">${esc(n.title)}</div>
+        <div class="d">${n.date}</div>
+        ${n.oneLiner ? `<div class="one">${esc(n.oneLiner)}</div>` : ""}
+      </button></li>`).join("")}
+    </ul>`).join("");
+  app.innerHTML = `
+    <button class="back" onclick="location.hash=''">&larr; 전체 과목</button>
+    <h1 class="course">${esc(c.name)}</h1>
+    <div class="course-sub">${esc(c.prof)} · ${esc(c.when)} · 요약 ${ns.length}개</div>
+    ${groups || `<div class="empty">아직 요약이 없습니다.</div>`}`;
+  window.scrollTo(0, 0);
+}
+
+function renderNote(id) {
+  const n = D.notes.find(x => x.id === id);
+  if (!n) return renderHome();
+  const c = D.courses[n.slug];
+  let md = n.md
+    .replace(/^> \*\*한 줄 요약\*\*:.*$/m, "")                 // 히어로로 대체
+    .replace(/==([^=\n]+)==/g, "<mark>$1</mark>");
+  app.innerHTML = `
+    <button class="back" onclick="location.hash='#/course/${esc(n.slug)}'">&larr; ${esc(c.name)}</button>
+    <div class="chip"><span class="dot" style="background:${chipColor(c.hue)}"></span>${esc(c.name)} · ${n.week}주차</div>
+    <h1 class="note-title">${esc(n.title)}</h1>
+    <div class="note-date">${n.date}</div>
+    ${n.oneLiner ? `<p class="tldr"><span>${esc(n.oneLiner)}</span></p>` : ""}
+    <div class="note-body">${marked.parse(md)}</div>`;
+
+  const body = app.querySelector(".note-body");
+  // 표 가로 스크롤 래핑
+  body.querySelectorAll("table").forEach(t => {
+    const w = document.createElement("div");
+    w.className = "tbl";
+    t.parentNode.insertBefore(w, t);
+    w.appendChild(t);
+  });
+  // h2 견출지 색 + 보조 섹션 접기
+  body.querySelectorAll("h2").forEach(h2 => {
+    const txt = h2.textContent;
+    if (TAB_ACT.some(k => txt.includes(k))) h2.classList.add("tab-act");
+    if (TAB_CAL.some(k => txt.includes(k))) h2.classList.add("tab-cal");
+    if (AUX_SECTIONS.some(k => txt.includes(k))) {
+      const det = document.createElement("details");
+      det.className = "aux";
+      const sum = document.createElement("summary");
+      sum.textContent = txt.replace(/^🧠\s*/, "");
+      det.appendChild(sum);
+      const inner = document.createElement("div");
+      inner.className = "aux-body";
+      let el = h2.nextSibling;
+      while (el && !(el.nodeType === 1 && el.tagName === "H2")) {
+        const next = el.nextSibling;
+        inner.appendChild(el);
+        el = next;
+      }
+      det.appendChild(inner);
+      h2.parentNode.replaceChild(det, h2);
+    }
+  });
+  window.scrollTo(0, 0);
+}
+
+function md(t) { return marked.parse((t || "").replace(/==([^=\n]+)==/g, "<mark>$1</mark>")); }
+
+function modeBar(active) {
+  const btn = (k, label, href) =>
+    `<button class="mode${active === k ? " on" : ""}" onclick="location.hash='${href}'">${label}</button>`;
+  return `<div class="modes">${btn("notes", "강의노트", "")}${btn("exams", "시험지", "#/exams")}${btn("todo", "할 일", "#/todo")}</div>`;
+}
+
+function examTitle(e) { return e.title || `${e.week}주차 시험지`; }
+function examsOf(slug) { return (D.exams || []).filter(e => e.slug === slug); }
+
+function renderExams() {
+  const total = (D.exams || []).reduce((a, e) => a + e.count, 0);
+  const rows = D.order.map(slug => {
+    const c = D.courses[slug], es = examsOf(slug);
+    if (!es.length) return "";
+    const items = es.map(e => `
+      <li><button class="note-row" onclick="location.hash='#/exam/${encodeURIComponent(e.id)}'">
+        <div class="t">${esc(examTitle(e))}</div>
+        <div class="d">${e.count}문항</div>
+      </button></li>`).join("");
+    return `
+      <div style="margin-top:26px">
+        <div class="chip"><span class="dot" style="background:${chipColor(c.hue)}"></span>${esc(c.name)}</div>
+        <ul class="notes">${items}</ul>
+      </div>`;
+  }).join("");
+  app.innerHTML = `
+    <span class="eyebrow">__LABEL__</span>
+    <h1 class="site">시험지</h1>
+    <div class="built">마지막 갱신 ${D.built} · 총 ${total}문항</div>
+    ${modeBar("exams")}
+    ${rows || `<div class="empty">아직 시험지가 없습니다.</div>`}`;
+  window.scrollTo(0, 0);
+}
+
+function renderExam(id) {
+  const e = (D.exams || []).find(x => x.id === id);
+  if (!e) return renderExams();
+  const c = D.courses[e.slug];
+  const mcq = e.questions.filter(q => q.choices);
+  const inline = t => md(t).replace(/^<p>|<\/p>\s*$/g, "");
+  const qs = e.questions.map(q => {
+    const src = q.source ? `<div class="q-src">${inline(q.source)}</div>` : "";
+    if (!q.choices) return `
+    <div class="q nochoice" id="q${q.n}">
+      <div class="q-head"><span class="q-no">Q${q.n}</span><span class="q-meta">${esc(q.type)} · ${esc(q.points)}</span></div>
+      <div class="q-body">${md(q.prompt)}</div>
+      ${q.answer ? `<details class="ans"><summary>정답 보기</summary>
+        <div class="ans-body">${md(q.answer)}</div>${src}
+      </details>` : ""}
+    </div>`;
+    const chs = q.choices.map(ch => `
+        <li><button class="ch${q.key.includes(ch.k) ? " key" : ""}" data-k="${ch.k}" onclick="quizPick(${q.n},'${ch.k}')">
+          <span class="k">${ch.k}</span><span>${inline(ch.text)}</span></button></li>`).join("");
+    return `
+    <div class="q" id="q${q.n}" data-n="${q.n}">
+      <div class="q-head"><span class="q-no">Q${q.n}</span><span class="q-meta">${esc(q.type)} · ${esc(q.points)}</span><span class="verdict"></span></div>
+      <div class="q-body">${md(q.stem)}</div>
+      ${q.multi ? `<div class="multi-hint">복수선택 — 해당하는 보기를 모두 누른다</div>` : ""}
+      <ul class="choices">${chs}</ul>
+      <details class="ans" ontoggle="this.closest('.q').classList.toggle('reveal', this.open)"><summary>정답 보기</summary>
+        <div class="ans-body"><p><b>정답 ${[...q.key].join(" · ")}</b></p>${q.explain ? md(q.explain) : ""}</div>${src}
+      </details>
+    </div>`;
+  }).join("");
+  const bar = mcq.length ? `
+    <div class="quiz-bar">
+      <span class="prog" id="quiz-prog"></span>
+      <button class="primary" id="quiz-grade" onclick="quizGrade()">전체 채점</button>
+      <button id="quiz-wrong" onclick="quizOnlyWrong()" hidden>틀린 문제만</button>
+      <button id="quiz-open" onclick="quizToggleAll()">정답 전체 보기</button>
+      <button onclick="quizReset()">다시 풀기</button>
+    </div>
+    <div id="quiz-score"></div>` : `
+    <div class="exam-actions"><button id="quiz-open" onclick="quizToggleAll()">정답 전체 펼치기</button></div>`;
+  // 통합 시험지(title 있음): 유형 칸(예: "3주차 1교시")이 바뀌는 첫 문항으로 점프
+  const groups = [];
+  if (e.title) e.questions.forEach(q => { if (!groups.length || groups[groups.length - 1].t !== q.type) groups.push({ t: q.type, n: q.n }); });
+  const jump = groups.length > 1 ? `<div class="jump">${groups.map(g => `<a onclick="document.getElementById('q${g.n}').scrollIntoView({behavior:'smooth',block:'start'})">${esc(g.t)}</a>`).join("")}</div>` : "";
+  app.innerHTML = `
+    <button class="back" onclick="location.hash='#/exams'">&larr; 시험지</button>
+    <div class="chip"><span class="dot" style="background:${chipColor(c.hue)}"></span>${esc(c.name)}${e.title ? "" : ` · ${e.week}주차`}</div>
+    <h1 class="note-title">${esc(examTitle(e))}</h1>
+    ${jump}
+    <div class="exam-sub">${e.count}문항${mcq.length ? ` · 객관식 ${mcq.length}문항은 보기를 눌러 풀고 「전체 채점」` : " · 정답은 각 문항의 “정답 보기”로 펼친다"}</div>
+    ${bar}
+    <div id="quiz-qs">${qs}</div>`;
+  QZ = { exam: e, open: false, onlyWrong: false, ...quizLoad(e.id) };
+  quizPaint();
+  window.scrollTo(0, 0);
+}
+
+/* 객관식 풀이 상태 — 선택·채점 여부는 이 브라우저 localStorage 에만 (편의 기능) */
+let QZ = null;
+function quizLoad(id) {
+  try { const s = JSON.parse(localStorage.getItem("quiz:" + id) || "{}"); return { picks: s.picks || {}, graded: !!s.graded }; }
+  catch (err) { return { picks: {}, graded: false }; }
+}
+function quizSave() {
+  try { localStorage.setItem("quiz:" + QZ.exam.id, JSON.stringify({ picks: QZ.picks, graded: QZ.graded })); } catch (err) {}
+}
+function quizPick(n, k) {
+  if (!QZ || QZ.graded) return;
+  const q = QZ.exam.questions.find(x => x.n === n), cur = QZ.picks[n] || "";
+  if (q && q.multi) QZ.picks[n] = [...(cur.includes(k) ? cur.replace(k, "") : cur + k)].sort().join("");
+  else QZ.picks[n] = cur === k ? undefined : k;
+  if (!QZ.picks[n]) delete QZ.picks[n];
+  quizSave(); quizPaint();
+}
+function quizGrade() {
+  const mcq = QZ.exam.questions.filter(q => q.choices);
+  const left = mcq.filter(q => !QZ.picks[q.n]).length;
+  QZ.graded = true; quizSave(); quizPaint();
+  // 틀린 문항은 해설을 펼쳐 둔다
+  mcq.forEach(q => { if (QZ.picks[q.n] !== q.key) { const d = document.querySelector(`#q${q.n} details.ans`); if (d) d.open = true; } });
+  document.getElementById("quiz-score").scrollIntoView({ behavior: "smooth", block: "center" });
+  if (left) console.log(`[quiz] 미응답 ${left}문항은 오답 처리`);
+}
+function quizReset() {
+  QZ.picks = {}; QZ.graded = false; QZ.onlyWrong = false; quizSave();
+  document.querySelectorAll("#quiz-qs details.ans").forEach(d => d.open = false);
+  QZ.open = false; quizPaint(); window.scrollTo(0, 0);
+}
+function quizToggleAll() {
+  QZ.open = !QZ.open;
+  document.querySelectorAll("#quiz-qs details.ans").forEach(d => d.open = QZ.open);
+  quizPaint();
+}
+function quizOnlyWrong() { QZ.onlyWrong = !QZ.onlyWrong; quizPaint(); }
+function quizPaint() {
+  const mcq = QZ.exam.questions.filter(q => q.choices);
+  let right = 0; const wrong = [];
+  mcq.forEach(q => {
+    const el = document.getElementById("q" + q.n), pick = QZ.picks[q.n];
+    el.querySelectorAll(".ch").forEach(b => { b.classList.toggle("sel", !!pick && pick.includes(b.dataset.k)); b.disabled = QZ.graded; });
+    const ok = pick === q.key;
+    if (ok) right++; else wrong.push(q.n);
+    el.classList.toggle("graded", QZ.graded);
+    el.classList.toggle("ok", QZ.graded && ok);
+    el.classList.toggle("ng", QZ.graded && !ok);
+    el.querySelector(".verdict").textContent = !QZ.graded ? "" : ok ? "정답" : pick ? "오답" : "미응답";
+  });
+  const open = document.getElementById("quiz-open");
+  if (open) open.textContent = QZ.open ? "정답 전체 접기" : (mcq.length ? "정답 전체 보기" : "정답 전체 펼치기");
+  if (!mcq.length) return;
+  const answered = mcq.filter(q => QZ.picks[q.n]).length;
+  document.getElementById("quiz-prog").innerHTML = `응답 <b>${answered}</b> / ${mcq.length}`;
+  const g = document.getElementById("quiz-grade");
+  g.textContent = QZ.graded ? "채점 완료" : "전체 채점"; g.disabled = QZ.graded;
+  const w = document.getElementById("quiz-wrong");
+  w.hidden = !QZ.graded; w.classList.toggle("on", QZ.onlyWrong);
+  w.textContent = QZ.onlyWrong ? "전체 문항 보기" : `틀린 문제만 (${wrong.length})`;
+  document.getElementById("quiz-qs").classList.toggle("only-wrong", QZ.graded && QZ.onlyWrong);
+  const pts = q => parseFloat(q.points) || 1;
+  const got = mcq.filter(q => QZ.picks[q.n] === q.key).reduce((a, q) => a + pts(q), 0);
+  const tot = mcq.reduce((a, q) => a + pts(q), 0);
+  document.getElementById("quiz-score").innerHTML = !QZ.graded ? "" : `
+    <div class="score">
+      <span class="big"><span>${right} / ${mcq.length}</span></span>
+      <span class="pct">${Math.round(right / mcq.length * 100)}% · ${got}/${tot}점</span>
+      ${wrong.length ? `<div class="wrong">틀린 문항 ${wrong.map(n => `<a onclick="document.getElementById('q${n}').scrollIntoView({behavior:'smooth',block:'center'})">Q${n}</a>`).join("")}</div>`
+        : `<div class="wrong">전부 맞혔다.</div>`}
+    </div>`;
+}
+
+/* ---------- 할 일 ---------- */
+function weekOf(d) {
+  const start = new Date(D.semesterStart + "T00:00:00");
+  return Math.floor((d - start) / 864e5 / 7) + 1;
+}
+function weekRange(w) {
+  const start = new Date(D.semesterStart + "T00:00:00");
+  const a = new Date(start.getTime() + (w - 1) * 7 * 864e5), b = new Date(a.getTime() + 6 * 864e5);
+  const f = d => `${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+  return `${f(a)} ~ ${f(b)}`;
+}
+function todoKey(t, it) {
+  let h = 0; for (const ch of (t.id + "|" + it.text)) h = (h * 31 + ch.charCodeAt(0)) >>> 0;
+  return "todo:" + h.toString(36);
+}
+function lsGet(k) { try { return localStorage.getItem(k) === "1"; } catch (e) { return false; } }
+function lsSet(k, v) { try { v ? localStorage.setItem(k, "1") : localStorage.removeItem(k); } catch (e) {} }
+function isDone(t, it) { return it.done || lsGet(todoKey(t, it)); }
+function dueInfo(due, now) {
+  if (!due) return null;
+  const d = new Date(due.replace(" ", "T") + (due.length === 10 ? "T23:59" : "") + ":00");
+  const left = (d - now) / 864e5;
+  const cls = left < 0 ? "over" : left <= 2 ? "soon" : "";
+  const label = due.slice(5);  // MM-DD HH:MM
+  return { cls, label: cls === "over" ? `지남 · ${label}` : label };
+}
+function toggleTodo(key, checked) {
+  lsSet(key, checked);
+  renderTodo(window.scrollY);
+}
+function inline(t) { return md(t).replace(/^<p>|<\/p>\s*$/g, ""); }
+
+function renderTodo(keepY) {
+  const todos = D.todos || [];
+  const now = new Date();
+  const curWeek = weekOf(now);
+  const weeks = [...new Set(todos.map(t => t.week))].sort((a, b) => b - a);   // 최신 주차 먼저
+  let openTotal = 0, dueSoon = 0;
+  todos.forEach(t => t.items.forEach(it => {
+    if (isDone(t, it)) return;
+    openTotal++;
+    const di = dueInfo(it.due, now);
+    if (di && (di.cls === "soon" || di.cls === "over")) dueSoon++;
+  }));
+
+  const blocks = weeks.map(w => {
+    const courses = D.order.map(slug => {
+      const ts = todos.filter(t => t.week === w && t.slug === slug);
+      if (!ts.length) return "";
+      const c = D.courses[slug];
+      const rows = ts.flatMap(t => t.items.map(it => ({ t, it })))
+        .sort((a, b) => isDone(a.t, a.it) - isDone(b.t, b.it))   // 미완료 먼저
+        .map(({ t, it }) => {
+          const done = isDone(t, it), key = todoKey(t, it), di = dueInfo(it.due, now);
+          return `
+          <li class="todo-item${done ? " done" : ""}">
+            <input type="checkbox" ${done ? "checked" : ""} ${it.done ? "disabled title='파일에서 완료 처리됨'" : ""}
+                   onchange="toggleTodo('${key}', this.checked)">
+            <div>
+              <div class="todo-text">${inline(it.text)}${di ? `<span class="due ${di.cls}">${esc(di.label)}</span>` : ""}</div>
+              ${it.notes.length ? `<ul class="todo-notes">${it.notes.map(n => `<li>${inline(n)}</li>`).join("")}</ul>` : ""}
+            </div>
+          </li>`;
+        }).join("");
+      const open = ts.reduce((a, t) => a + t.items.filter(it => !isDone(t, it)).length, 0);
+      return `
+      <div class="todo-course">
+        <div class="chip"><span class="dot" style="background:${chipColor(c.hue)}"></span>${esc(c.name)}${open ? ` · 미완료 ${open}` : " · 완료"}</div>
+        <ul class="todo-list">${rows}</ul>
+      </div>`;
+    }).join("");
+    const cls = w < curWeek ? " past" : "";
+    return `
+    <section class="todo-week${cls}">
+      <div class="todo-week-head"><h2>${w}주차</h2><span class="range">${weekRange(w)}</span>${w === curWeek ? `<span class="now">이번 주</span>` : ""}</div>
+      ${courses}
+    </section>`;
+  }).join("");
+
+  app.innerHTML = `
+    <span class="eyebrow">__LABEL__</span>
+    <h1 class="site">할 일</h1>
+    <div class="built">마지막 갱신 ${D.built} · 오늘 ${curWeek}주차</div>
+    ${modeBar("todo")}
+    <div class="todo-sub">미완료 <b>${openTotal}</b>건${dueSoon ? ` · 마감 임박·지남 <b>${dueSoon}</b>건` : ""}</div>
+    <div class="todo-legend">체크는 이 브라우저에만 저장된다 · 파일에서 <code>[x]</code> 처리된 항목은 고정</div>
+    ${blocks || `<div class="empty">아직 할 일이 없습니다.</div>`}`;
+  window.scrollTo(0, keepY || 0);
+}
+
+addEventListener("hashchange", render);
+render();
+</script>
