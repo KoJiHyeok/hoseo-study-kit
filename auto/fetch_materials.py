@@ -6,7 +6,8 @@
 - 원장 auto/materials-ledger.json 에 받은 항목을 적어 다음부터 건너뛴다.
 - 받은 파일과 **내용(md5)이 같은 파일이 materials/ 에 이미 있으면 저장하지 않는다** (예전에 손으로 이름 바꿔 넣은 것 포함).
 - 새 파일은 `<NN>주차_<LMS 원본 파일명>` 으로 저장. 원본 바이트 그대로 — 변환·수정 없음.
-- 출력 마지막 줄 = JSON 요약 {"login": bool, "new": [...], "skipped": [...]}. 종료코드 0 정상 / 2 로그인 만료 / 1 기타 실패.
+- **세션이 만료돼 있으면 aside 로 다시 로그인하고 이어서 받는다** (저장된 아이디·비밀번호 자동완성만 — 입력·추측 안 함, 최대 3회).
+- 출력 마지막 줄 = JSON 요약 {"login": bool, "relogin": n, "new": [...], "skipped": [...]}. 종료코드 0 정상 / 2 재로그인까지 실패 / 1 기타 실패.
 
 사용: python auto/fetch_materials.py [--dry-run] [과목slug ...]   (맥은 python3)
 """
@@ -32,6 +33,35 @@ def repl(js):
         if line.startswith("RESULT:"):
             return json.loads(line[7:])
     raise RuntimeError("aside repl 결과 없음: " + (p.stdout + p.stderr)[-400:])
+
+
+RELOGIN_TRIES = 3
+RELOGIN_PROMPT = (
+    "{base}/login/index.php 를 열어라. 상단에 로그아웃 링크가 보이면 이미 로그인된 것이니 아무것도 누르지 말고 끝내라. "
+    "로그인 페이지면 브라우저에 저장된 아이디·비밀번호 자동완성으로 채우고 로그인 버튼을 눌러라. "
+    "자동완성이 안 되면 추측하거나 직접 입력하지 말고 '저장된 비밀번호 없음' 이라고 보고하고 멈춰라. "
+    "로그인 버튼을 눌렀는데 여전히 로그인 페이지면 5초 뒤 한 번 더 눌러라. 로그인 외에는 아무것도 누르지 마라."
+)
+
+
+def relogin():
+    """LMS 세션 만료 → aside 로 재로그인. 성공 여부는 호출한 쪽이 목록을 다시 읽어 판정한다."""
+    try:
+        subprocess.run(["aside", "--timeout", "4m", RELOGIN_PROMPT.format(base=BASE)], capture_output=True,
+                       text=True, encoding="utf-8", errors="replace", timeout=300)
+    except Exception as e:                                   # aside 미설치·타임아웃 — 재시도 루프가 실패로 끝낸다
+        print(f"  ! 재로그인 호출 실패: {e}", file=sys.stderr)
+
+
+def with_login(summary, fn, *args):
+    """fn 결과가 login:false 면 재로그인 후 다시 부른다 (최대 RELOGIN_TRIES 회)."""
+    r = fn(*args)
+    while not r.get("login") and summary["relogin"] < RELOGIN_TRIES:
+        summary["relogin"] += 1
+        print(f"  · LMS 세션 만료 → aside 재로그인 ({summary['relogin']}/{RELOGIN_TRIES})", file=sys.stderr)
+        relogin()
+        r = fn(*args)
+    return r
 
 
 def list_course(cid):
@@ -61,21 +91,28 @@ console.log("RESULT:" + JSON.stringify(outL)); await closeTab(pgL);
 
 
 def download(cid, url):
-    """탭 안 fetch 로 받아 base64 로 넘긴다 → (최종 URL, bytes)."""
+    """탭 안 fetch 로 받아 base64 로 넘긴다 → (최종 URL, bytes).
+    본문을 받기 **전에** 응답 헤더로 확장자·크기를 거른다 — 100MB 넘는 pptx·영상을 다 받다가 CDP 30초 제한에 걸린 적 있다."""
     js = r"""
 const pgD = await openTab("%s/course/resources.php?id=%d");
-const outD = await pgD.evaluate(async (u) => {
+const outD = await pgD.evaluate(async ({ u, exts, max }) => {
   if (/login\/index\.php/.test(location.href)) return { login: false };
-  const r = await fetch(u, { credentials: "include" });
-  if (!r.ok) return { login: true, error: "HTTP " + r.status };
-  if (/login\/index\.php/.test(r.url)) return { login: false };
-  const buf = new Uint8Array(await r.arrayBuffer());
-  if (buf.length > %d * 1048576) return { login: true, error: "too big " + buf.length, url: r.url };
-  let s = ""; for (let i = 0; i < buf.length; i += 32768) s += String.fromCharCode.apply(null, buf.subarray(i, i + 32768));
-  return { login: true, url: r.url, ctype: r.headers.get("content-type"), b64: btoa(s) };
-}, %s);
+  const ac = new AbortController();
+  const r = await fetch(u, { credentials: "include", signal: ac.signal });
+  if (/login\/index\.php/.test(r.url)) { ac.abort(); return { login: false }; }
+  if (!r.ok) { ac.abort(); return { login: true, error: "HTTP " + r.status }; }
+  const name = decodeURIComponent(new URL(r.url).pathname.split("/").pop());
+  const ext = ((name.match(/\.[^.]+$/) || [""])[0]).toLowerCase();
+  if (!exts.includes(ext)) { ac.abort(); return { login: true, url: r.url, skip: "ext" }; }
+  const len = +r.headers.get("content-length") || 0;
+  if (len > max) { ac.abort(); return { login: true, url: r.url, error: "too big " + len }; }
+  const blob = await r.blob();
+  if (blob.size > max) return { login: true, url: r.url, error: "too big " + blob.size };
+  const b64 = await new Promise((ok, no) => { const f = new FileReader(); f.onload = () => ok(f.result.slice(f.result.indexOf(",") + 1)); f.onerror = no; f.readAsDataURL(blob); });
+  return { login: true, url: r.url, ctype: r.headers.get("content-type"), b64 };
+}, { u: %s, exts: %s, max: %d });
 console.log("RESULT:" + JSON.stringify(outD)); await closeTab(pgD);
-""" % (BASE, cid, MAX_MB, json.dumps(url))
+""" % (BASE, cid, json.dumps(url), json.dumps(sorted(EXTS)), MAX_MB * 1048576)
     return repl(js)
 
 
@@ -93,14 +130,14 @@ def main():
     args = [a for a in sys.argv[1:] if not a.startswith("--")]
     dry = "--dry-run" in sys.argv
     ledger = json.loads(LEDGER.read_text(encoding="utf-8")) if LEDGER.exists() else {}
-    summary = {"login": True, "new": [], "skipped": [], "errors": []}
+    summary = {"login": True, "relogin": 0, "new": [], "skipped": [], "errors": []}
     for slug, (cid, folder) in COURSES.items():
         if args and slug not in args:
             continue
         mat = ROOT / folder / "materials"
         have = {md5(f.read_bytes(), f.name): f.name for f in mat.glob("*") if f.is_file()} if mat.exists() else {}
         done = ledger.setdefault(slug, {})
-        lst = list_course(cid)
+        lst = with_login(summary, list_course, cid)
         if not lst.get("login"):
             summary["login"] = False
             break
@@ -118,10 +155,19 @@ def main():
             if dry:
                 summary["new"].append(f"{slug} {week}주차 (dry) {unquote(url.rsplit('/', 1)[-1])}")
                 continue
-            r = download(cid, url)
+            try:
+                r = with_login(summary, download, cid, url)
+            except Exception as e:                          # 한 파일 실패가 나머지를 막지 않게
+                summary["errors"].append(f"{slug} {url}: {str(e)[-160:]}")
+                continue
             if not r.get("login"):
                 summary["login"] = False
                 break
+            if r.get("skip") == "ext":                      # 영상 등 — 본문을 받지 않고 원장에만 남긴다
+                name = unquote(urlparse(r["url"]).path.rsplit("/", 1)[-1])
+                done[key] = {"skip": name}
+                summary["skipped"].append(f"{slug} {name} (확장자)")
+                continue
             if r.get("error") or "b64" not in r:
                 summary["errors"].append(f"{slug} {url}: {r.get('error')}")
                 if str(r.get("error", "")).startswith("too big"):    # 매일 다시 받지 않게 원장에 남긴다
